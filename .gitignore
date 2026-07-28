@@ -1,0 +1,62 @@
+# to allow small .npy/.parquet fixture or so, can use '!tests/fixtures/*.parquet' on given folder.
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Environments and secrets
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# Local data and generated artifacts
+data/raw/
+data/processed/
+artifacts/
+models/
+checkpoints/
+outputs/
+cache/
+
+# MLflow
+mlruns/
+mlruns.db
+*.db-journal
+
+# Model and tensor files
+*.safetensors
+*.ckpt
+*.pt
+*.pth
+*.bin
+*.onnx
+*.npz
+*.npy
+
+# Large tabular outputs
+*.parquet
+
+# Logs and temporary files
+*.log
+tmp/
+temp/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db
