@@ -12,7 +12,7 @@ Fields: `name | type | path | source | status | notes`
 
 | name | type | path | source | status | notes |
 |------|------|------|--------|--------|-------|
-| deberta-v3-base | model (encoder) | `models/deberta-v3-base/` | `microsoft/deberta-v3-base` (HF) | verified | Pilot model. 183.8M params, 12 layers, hidden 768, `model_type=deberta-v2`. Weights load via `AutoModel`; forward pass OK. Repo has no `model.safetensors`; weights are `pytorch_model.bin` (371 MB). Redundant `tf_model.h5` / `rust_model.ot` were NOT downloaded. Tokenizer (`spm.model`) requires the `sentencepiece` package, which is **not** installed in the shared env (see [[blocker-sentencepiece-missing]] / `PROJECT_STATUS.md`). |
+| deberta-v3-base | model (encoder) | `models/deberta-v3-base/` | `microsoft/deberta-v3-base` (HF) | verified | Pilot model. 183.8M params, 12 layers, hidden 768, `model_type=deberta-v2`. Weights load via `AutoModel`; forward pass OK. Repo has no `model.safetensors`; weights are `pytorch_model.bin` (371 MB). Redundant `tf_model.h5` / `rust_model.ot` were NOT downloaded. Tokenizer (`spm.model`, `DebertaV2Tokenizer`, vocab 128000) loads via `sentencepiece==0.2.2` (installed in shared env; see `requirements.txt`). A spurious `fix_mistral_regex` warning from transformers 5.12.1 is a false positive; tokenization output is correct. |
 | Qwen3-Embedding-0.6B | model (embedder) | `models/Qwen3-Embedding-0.6B/` | `Qwen/Qwen3-Embedding-0.6B` (HF), migrated from `~/projects/lora/models/` | verified | Transfer model. 595.8M params, 28 layers, hidden 1024, `model_type=qwen3`. `model.safetensors` (1.19 GB). Ships sentence-transformers config (`1_Pooling/`, `modules.json`, `config_sentence_transformers.json`); usable as a bi-encoder. Tokenizer loads without extra deps. Apache-2.0. |
 
 ## Datasets
@@ -24,4 +24,4 @@ Fields: `name | type | path | source | status | notes`
 ## Notes
 
 - Model weights and datasets are gitignored (`models/`, `data/raw/`) and are NOT committed, per `AGENT_PROTOCOL.md` §4.
-- `sentencepiece` is a required runtime dependency for the deberta-v3-base tokenizer but is absent from the shared `ai-env`; installing it needs explicit user approval (`AGENT_PROTOCOL.md` §3).
+- `sentencepiece==0.2.2` was added to the shared `ai-env` for the deberta-v3-base tokenizer; tracked in `requirements.txt`.

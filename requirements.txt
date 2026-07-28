@@ -1,0 +1,9 @@
+# Project-specific dependencies for layer-evidence-classification.
+#
+# This project runs on the shared `ai-env` virtual environment documented
+# in ~/projects/CLAUDE.md (torch, transformers, peft, accelerate, datasets,
+# bitsandbytes, safetensors, mlflow, ...). Only additions made for this
+# project are pinned here. Install into the shared env only with approval
+# (AGENT_PROTOCOL.md §3).
+
+sentencepiece==0.2.2
