@@ -1,11 +1,15 @@
 # EXP-20260729-002 - Linear-probe mid-layer variance collapse on DeBERTa-v3-base / CLINC150
 
 - **Date**: 2026-07-29
-- **State**: IN PROGRESS (diagnostic campaign; EXP-20260729-001 mainline paused)
+- **State**: COMPLETE (diagnostic campaign; EXP-20260729-001 mainline paused)
 - **Parent**: EXP-20260729-001
-- **Git commit**: _(filled at finalisation)_
+- **Git commit**: `aa9cc6d` (dirty: EXP-002 artifact data under gitignored `artifacts/`)
 - **MLflow experiment**: `EXP-20260729-002` (`sqlite:///mlruns.db`)
-- **Artifact root**: `artifacts/EXP-20260729-002/`
+  - FINISHED runs: `lr_grid` (cd6fea47), `optimizer` (38d2497a), `no_prompt`
+    (d91a96ac), `ft_backbone` (af5a82f6). The `ln_ablation` MLflow run FAILED
+    (an `AffineOnlyHead` import bug, since fixed); its data was recovered via a
+    no-MLflow re-run and is saved at `03a_ln_ablation/ln_ablation_lr1e-2.json`.
+- **Artifact root**: `artifacts/EXP-20260729-002/` (gitignored; see its `README.md`)
 
 ## Question
 
