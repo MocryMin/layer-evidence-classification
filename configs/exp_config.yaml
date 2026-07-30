@@ -1,0 +1,93 @@
+# EXP-20260729-001 - frozen-backbone pilot for intermediate-layer recoverability.
+# Source spec: plans/EXP-20260729-001--*/EXP-20260729-001--AgentProtocol.md
+# `learning_rate` is resolved by the lr smoke test and written into
+# artifacts/<experiment_id>/run_config.yaml. Do not edit it here to match a
+# particular run; instead update the resolved copy.
+
+experiment_id: EXP-20260729-001
+
+# Model
+model_name: microsoft/deberta-v3-base
+model_path: models/deberta-v3-base
+sentencepiece_version: "0.2.2"
+
+# Dataset
+dataset: CLINC150
+dataset_source: data/raw/clinc_oos
+dataset_config: plus          # HF clinc/clinc_oos config; in-scope == 100/class train
+dataset_split: official
+drop_oos_label: 42            # label id 42 == "oos" in clinc/clinc_oos
+n_classes: 150                # in-scope intents after dropping OOS
+prompt: "Classify the intent: {utterance}"
+
+# Tokenization
+pooling: cls
+cls_token_index: 0
+max_length: 512
+truncation: left
+lowercase: false
+static_padding: false
+dynamic_padding: longest_in_batch
+
+# Backbone
+backbone_frozen: true
+n_transformer_layers: 12
+final_layer: 12               # L
+probe_layers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+# HF hidden_states indexing: [0]=embedding, [1]=block1, ..., [12]=block12/final
+hidden_state_offset: 1        # layer l -> hidden_states[l]
+
+# Cache
+cache_format: safetensors
+cache_dtype: float16
+training_dtype: float32
+
+# Head
+head_type: linear_with_bias
+head_input_dim: 768
+head_init: xavier_uniform
+head_bias_init: zeros
+loss: cross_entropy
+
+# Optimisation (lr resolved by smoke test)
+learning_rate: null
+optimizer: AdamW
+weight_decay: 0.01
+epochs: 100
+batch_size_cached_head_training: 256
+gradient_clip_norm: 1.0
+scheduler: none
+
+# Checkpointing
+checkpoint_frequency: every_epoch
+checkpoint_selection:
+  primary: validation_accuracy
+  tie_breaker: validation_nll
+
+# Seeds (same list for every layer; within a seed, shared init+shuffle seed)
+seeds: [17, 29, 43, 59, 71, 89, 101, 127, 149, 173]
+
+# LR smoke test (validation-only, test split not involved)
+lr_smoke_test:
+  candidates: [1.0e-5, 1.0e-4, 1.0e-3]
+  layers: [1, 6, 12]
+  seed: 17
+  selection_rule: max_mean_validation_accuracy   # tie-break: min_mean_validation_nll
+  test_involved: false
+
+# Hypothesis tolerances
+epsilon_1: 0.02    # H1 non-inferiority tolerance
+epsilon_2: 0.05    # H2 strong continuation criterion (oracle gain)
+
+# Bootstrap
+bootstrap_resamples: 10000
+bootstrap_ci: 0.95
+bootstrap_method: percentile
+
+# Paths
+artifact_root: artifacts/EXP-20260729-001
+mlflow_tracking_uri: sqlite:///mlruns.db
+mlflow_experiment_name: EXP-20260729-001
+
+# Reproducibility
+deterministic: true
