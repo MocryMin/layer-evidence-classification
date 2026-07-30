@@ -146,7 +146,49 @@ input framing.
 
 ### Task 3c - Fine-tuned backbone
 
-_(to be filled from `03c_ft_backbone/`)_
+Full fine-tune (backbone + last-layer CLS head, AdamW lr=2e-5, 5 epochs, bs=32),
+saved to `models/deberta-v3-base-clinc150-ft/`, re-cached, re-probed
+(`03c_ft_backbone/`). FT history: val/test acc 0.910/0.902 -> 0.961/0.956 ->
+0.963/0.960 -> 0.970/0.963 -> **0.973/0.967**.
+
+FT-backbone feature stats (inter-sample std / class-signal ratio, frozen -> FT):
+
+| layer | inter_std (frozen -> FT) | class-signal (frozen -> FT) |
+|------:|--------------------------|-----------------------------|
+| 6  | 0.00020 -> 0.00020 | 0.19 -> 0.46 |
+| 8  | 0.00022 -> 0.00044 | 0.36 -> 3.00 |
+| 11 | 0.0245 -> 0.210 | 0.28 -> 7.33 |
+| 12 | 0.0203 -> 0.875 | 0.37 -> 12.84 |
+
+Plain / LN probe on the FT backbone (val acc), with frozen-backbone values for
+reference:
+
+| layer | plain(FT) | ln(FT) | plain(frozen) | ln(frozen) |
+|------:|----------:|-------:|--------------:|-----------:|
+| 1  | 0.142 | 0.813 | 0.135 | 0.806 |
+| 3  | 0.527 | 0.895 | 0.437 | 0.876 |
+| 6  | 0.072 | 0.931 | 0.027 | 0.651 |
+| 7  | 0.574 | 0.966 | 0.064 | 0.901 |
+| 8  | 0.481 | 0.969 | 0.028 | 0.831 |
+| 9  | 0.970 | 0.969 | 0.583 | 0.844 |
+| 12 | 0.969 | 0.972 | 0.789 | 0.870 |
+
+**Findings**:
+- FT last layer reaches 0.967 test acc - as predicted, far above 0.90, so the test
+  set has only ~150 final-layer errors: class-wise recoverability (R_{l,c}) is
+  statistically starved. The frozen-backbone regime is where recoverability is
+  meaningful.
+- FT does **not** fix the mid-layer CLS variance collapse: inter_sample_std for
+  layers 1-8 stays at 0.0002-0.004. FT concentrates task signal in the upper
+  layers (layer 11/12 inter_std and class-signal explode) and raises the mid-layer
+  class-signal *ratio* (layer 8: 0.36 -> 3.0) without raising the absolute
+  variance.
+- Plain probe on FT backbone: upper layers (9-12) become excellent (~0.97), mid
+  layers (1-8) stay collapsed (0.07-0.57) - the ill-conditioning persists.
+- LN on the FT backbone rescues every layer to 0.79-0.97 (layer 6: 0.651 -> 0.931,
+  layer 8: 0.831 -> 0.969): FT strengthened the mid-layer signal and LN extracts it.
+- With FT+LN, layers 7-12 all sit at ~0.97 - layer-wise differences (the substrate
+  of H1'/H2) largely vanish near ceiling.
 
 ### Task 3d - Optimizer (AdamW / SGD / LBFGS)
 
@@ -177,16 +219,98 @@ first-order methods cannot. Layer 6 - the most collapsed - is only partially rec
 
 ## Observations
 
-_(filled after phases complete)_
+1. **The collapse is real and structural.** Frozen DeBERTa-v3-base mid-layer CLS
+   representations have inter-sample std of 0.0002-0.006 (vs 0.020-0.025 at the
+   final layer), with a dominant near-constant component (within-sample std
+   0.07-0.24, participation ratio 1-3.5 for layers 1-6). The CLS vector has a
+   fixed "shape" that is nearly identical across samples; the class signal lives
+   in tiny per-sample deviations.
+
+2. **But the signal is present and linearly extractable.** LBFGS (plain linear
+   head, no feature transform) fits every layer to 0.41-0.86 (layer 1: 0.135 ->
+   0.789; layer 6: 0.027 -> 0.410). The AdamW/SGD failure is therefore an
+   optimisation/ill-conditioning artefact, not absence of linear signal.
+
+3. **It is a conditioning problem with two independent fixes.** The near-constant
+   component makes the linear-probe loss landscape badly conditioned: the
+   class-discriminative direction has vanishing gradient relative to the constant
+   direction. Two routes resolve it:
+   - *Second-order optimiser* (LBFGS) - navigates the ill-conditioned landscape
+     directly, no feature transform.
+   - *LayerNorm head* (normalise + affine) - reshapes features into a
+     well-conditioned space, so first-order AdamW works.
+   First-order methods without conditioning fixes (AdamW/SGD plain,
+   norm-only, affine-only) fail on the severely collapsed layers.
+
+4. **LN's benefit is normalisation + affine in synergy, not either alone.**
+   norm-only (per-sample normalise, no affine) fails because per-sample
+   normalisation does not remove the *cross-sample* constant. affine-only
+   (per-dim rescale, no normalise) rescues mildly-collapsed layers but not
+   severely-collapsed ones (cannot amplify the 0.0002-scale signal). Full LN does
+   both: normalisation amplifies the signal to a learnable scale, affine cancels
+   the residual constant and selects dims.
+
+5. **The collapse is intrinsic to the frozen backbone, not the input framing.**
+   Removing the instruction prefix marginally raises inter-sample std and helps
+   the plain probe a little (layer 1: 0.135 -> 0.268) but leaves the collapse
+   pattern intact.
+
+6. **FT does not repair the mid-layer collapse but concentrates signal upstream.**
+   FT drives the last layer to 0.967 test acc and explodes layers 11-12 variance,
+   while mid-layer inter-sample std stays at 0.0002-0.004. FT raises the mid-layer
+   class-signal *ratio* (extractable by LN to 0.93-0.97) but leaves the absolute
+   variance - and hence the plain-probe collapse - intact.
+
+7. **Mid layers can exceed the final layer once the probe fits.** With LBFGS,
+   layer 3 (0.862) > layer 12 (0.812); with LN, layers 7/10 (0.90) > layer 12
+   (0.87). The H1'/H2 regime that EXP-001 targets is only visible when the probe
+   actually fits.
 
 ## Interpretation, alternatives, limitations
 
-_(filled after phases complete)_
+- The pure-linear-probe protocol (`linear_with_bias`, AdamW) in EXP-001 would
+  produce a **false negative** for H1/H1'/H2: mid layers would appear
+  unprobeable (~1-13%) not because they lack recoverable signal, but because
+  first-order optimisation cannot navigate the ill-conditioned mid-layer CLS
+  landscape. Any layer-comparison conclusion drawn from such a probe is an
+  artefact of the optimiser, not of the representations.
+- Two minimal remedies preserve the "frozen backbone + linear readout" spirit:
+  (a) keep the plain linear head but switch the optimiser to **LBFGS**; (b) keep
+  AdamW but add a **LayerNorm** before the linear head. Both make every layer
+  fittable. LN is the cheaper integration (one extra module, AdamW unchanged);
+  LBFGS is the purer "linear probe" (no nonlinearity) but is full-batch and
+  slower, and is somewhat weaker on the most-collapsed layer (layer 6: 0.41 vs
+  LN's 0.65 on the frozen backbone).
+- A fixed cross-sample standardisation (linear, non-learned) is a third option
+  that would keep the probe strictly linear; it was not run here and is left as a
+  follow-up.
+- Limitations: single seed (17) for the diagnostics; representative-layer grids
+  for the lr search; LBFGS run for 30 epochs with default strong-Wolfe (may
+  underperform a tuned schedule); FT is a single 5-epoch run. These suffice to
+  establish the qualitative finding (collapse + conditioning, not absence of
+  signal) but the exact numbers are point estimates.
 
 ## Decision
 
-_(filled after phases complete)_
+- **EXP-001 mainline must use a probe that actually fits.** Adopt **LN head +
+  AdamW (lr=1e-2)** as the default probe for the recoverability experiment (all
+  12 layers fittable on the frozen backbone; cheapest integration; mid layers
+  become competitive with the final layer, enabling H1'/H2). Record the
+  head-type change and lr in the resolved run config. Keep the frozen-backbone
+  regime (not FT) so that enough final-layer errors remain for class-wise
+  recoverability.
+- The variance-collapse finding is recorded as a standalone methodological result
+  (this report): *first-order linear probing of frozen transformer mid-layer CLS
+  yields false negatives due to ill-conditioning; use second-order optimisation
+  or feature normalisation.*
 
 ## Next action
 
-_(filled after phases complete)_
+1. Amend the EXP-001 protocol: `head_type: layernorm + linear_with_bias`,
+   `learning_rate: 1e-2` (frozen-backbone), and re-run the (LN-head) lr smoke test
+   to confirm 1e-2 is selected.
+2. Proceed with the 12-layer × 10-seed frozen-backbone recoverability run using
+   the LN head, then compute R_l / R_{l,c} / oracle / D_JS and the H1/H1'/H2
+   judgements.
+3. (Optional follow-up) test fixed cross-sample standardisation as a strictly
+   linear alternative to LN.
