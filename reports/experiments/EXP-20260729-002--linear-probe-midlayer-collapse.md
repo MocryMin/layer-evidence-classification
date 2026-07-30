@@ -116,7 +116,33 @@ collapsed layer (6) but works on milder layers; full LN is the only AdamW varian
 
 ### Task 3b - No-instruction prompt
 
-_(to be filled from `03b_no_prompt/`)_
+Re-cached with the pure-utterance prompt `{utterance}` (no `Classify the intent:`
+prefix) and repeated the stats + plain probe (`03b_no_prompt/`).
+
+Inter-sample std, with-prompt -> no-prompt (selected layers):
+
+| layer | with-prompt | no-prompt |
+|------:|------------:|----------:|
+| 1  | 0.00364 | 0.00654 |
+| 6  | 0.00020 | 0.00028 |
+| 9  | 0.00117 | 0.00206 |
+| 12 | 0.02035 | 0.02669 |
+
+Plain linear probe best val acc, with-prompt -> no-prompt:
+
+| layer | with-prompt | no-prompt |
+|------:|------------:|----------:|
+| 1  | 0.135 | 0.268 |
+| 6  | 0.027 | 0.076 |
+| 9  | 0.583 | 0.736 |
+| 12 | 0.789 | 0.803 |
+
+**Finding**: removing the instruction prefix slightly *increases* inter-sample std
+and slightly improves the plain probe (layers 1, 9 notably), but the collapse
+pattern is unchanged - layers 4-8 still fall to 0.04-0.22. The prompt is not the
+root cause; it marginally worsens the collapse. The mid-layer CLS anisotropy is an
+intrinsic property of the frozen DeBERTa-v3-base backbone, not an artefact of the
+input framing.
 
 ### Task 3c - Fine-tuned backbone
 

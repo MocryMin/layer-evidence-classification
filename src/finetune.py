@@ -83,7 +83,11 @@ def finetune_backbone(cfg, device) -> dict:
     splits = {}
     for split in ["train", "validation", "test"]:
         ds = load_split(cfg.dataset_abs_path, cfg.dataset_config, split, cfg.drop_oos_label, in_scope_ids)
-        splits[split] = tokenise_split(ds, tok, cfg.prompt_with_instruction, cfg.max_length, cfg.truncation)
+        to = tokenise_split(ds, tok, cfg.prompt_with_instruction, cfg.max_length, cfg.truncation)
+        # tokenise_split returns labels/sample_ids as numpy; convert to torch long tensors
+        to["labels"] = torch.as_tensor(to["labels"], dtype=torch.long)
+        to["sample_ids"] = torch.as_tensor(to["sample_ids"], dtype=torch.long)
+        splits[split] = to
 
     pad_id = tok.pad_token_id
     train_ids = splits["train"]["input_ids"]
