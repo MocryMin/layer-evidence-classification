@@ -11,7 +11,7 @@
   EXP-20260729-002; the redirected protocol (probe fix) is recorded in
   EXP-20260729-003.
 - **Redirects to**: EXP-20260729-002 (diagnostics), EXP-20260729-003 (redirected mainline)
-- **Git commit**: `38ffc00` (EXP-001 data + reproduction script; this report added on top)
+- **Git commit**: `271f873` (this report; EXP-001 data + reproduction script at `38ffc00`)
 - **MLflow experiment**: `EXP-20260729-001` (`sqlite:///mlruns.db`)
 - **Artifact root**: `artifacts/EXP-20260729-001/` (gitignored; see its `README.md`)
 
