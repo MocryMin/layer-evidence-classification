@@ -15,6 +15,7 @@ before the classifier:
 """
 from __future__ import annotations
 
+import torch
 import torch.nn as nn
 
 HEAD_TYPES = ["plain", "ln", "norm_only", "affine_only"]
