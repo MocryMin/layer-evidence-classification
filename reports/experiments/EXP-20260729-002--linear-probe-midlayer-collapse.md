@@ -269,6 +269,65 @@ collapse is specific to the *frozen base*; on a fine-tuned backbone Ridge(α=10)
 also means: of the linear methods tested, only **cross-entropy optimisation (LBFGS) or feature
 normalisation (LN)** rescue the frozen-base mid layers - L2 least-squares at a fixed α does not.
 
+> **Update (task 03g, below):** this conclusion was an artefact of only sweeping α≥0.1.
+> Extending the α grid down to 1e-6 (≈OLS) rescues L6 to 0.917 - see "Task 03g". Observation 8
+> is revised accordingly.
+
+### Task 03g - RidgeClassifier α grid (revises 03f)
+
+The 03f control only tried α=10 (plus a 5-point L6 sweep down to α=0.1) and concluded
+"fixed-α L2 least-squares does not rescue". This swept α over [1e-6, 1e-5, 1e-4, 1e-3,
+1e-2, 1e-1, 1, 10, 100] (`solver=svd`, `fit_intercept=True`) on three caches: frozen base
++ no-instruction prompt (03b), FT backbone + no-instruction prompt (newly cached), and -
+to disentangle α from prompt - frozen base + instruction prompt (EXP-001 cache). Data:
+`03g_ridge_alpha_grid/`.
+
+**Ridge at α=1e-6 (≈OLS) rescues the frozen-base mid layers.** Layer-6 val acc vs α:
+
+| α | base+instr | base+pure | ft+pure |
+|---:|---:|---:|---:|
+| 1e-6 | **0.917** | **0.912** | 0.944 |
+| 1e-4 | 0.864 | 0.873 | 0.933 |
+| 1e-2 | 0.454 | 0.621 | 0.843 |
+| 1e-1 | 0.189 | 0.354 | 0.676 |
+| 10   | 0.075 | 0.176 | 0.499 |
+| 100  | 0.073 | 0.173 | 0.496 |
+
+Performance rises monotonically as α shrinks; best α is 1e-6 (or 1e-5) for every frozen-base
+mid layer. At α=1e-6, layer 6 reaches 0.917 - on the *same* with-instruction cache where
+α=10 gave 0.075 and plain AdamW gave 0.027. Test acc tracks val (0.907 at L6), so this is
+not overfitting (n=15000 ≫ p=768×150).
+
+**Prompt is not the lever; α is.** At α=1e-6 the with-instruction and pure-utterance caches
+agree within 0.005 at every layer (L6: 0.917 vs 0.912). The variance collapse is intrinsic
+to the frozen backbone (03b: L6 inter-std 0.00028, essentially identical to the
+with-instruction 0.00020) and prompt-independent; removing the instruction does not fix it
+(observation 5 stands). What 03f missed was simply that α=10 is ~5 orders of magnitude too
+large for the frozen-base feature scale.
+
+**Cross-cache at α=1e-6 (val acc):**
+
+| layer | base+instr | base+pure | ft+pure |
+|---:|---:|---:|---:|
+| 1  | 0.826 | 0.792 | 0.788 |
+| 4  | 0.885 | 0.849 | 0.870 |
+| 6  | 0.917 | 0.912 | 0.944 |
+| 8  | 0.940 | 0.936 | 0.965 |
+| 10 | 0.942 | 0.926 | 0.968 |
+| 12 | 0.903 | 0.886 | 0.967 |
+
+FT is uniformly best and α-robust (L12 stays 0.967 even at α=10, because FT inflates the
+feature scale so X^T X eigenvalues dominate any α in this range). On the frozen base the
+mid-upper layers (7-10, ≈0.94) slightly exceed L12 (≈0.90).
+
+**This revises observation 8.** Closed-form least-squares (Ridge α≈1e-6, i.e. OLS) *does*
+rescue the frozen-base mid layers - and more decisively than any CE probe tried so far
+(L6: OLS 0.917 vs 30-epoch LBFGS 0.41 vs LN+AdamW 0.65 vs plain AdamW 0.027). What fails is
+(i) first-order CE optimisation (AdamW/SGD) on the ill-conditioned landscape and
+(ii) *over-regularised* Ridge (α=10). A correctly-scaled closed-form L2 solve recovers the
+signal. The paper's α=10 worked because its backbone was task-fine-tuned (well-scaled
+features); on the frozen base the matching α is ~1e-6.
+
 ## Observations
 
 1. **The collapse is real and structural.** Frozen DeBERTa-v3-base mid-layer CLS
@@ -318,13 +377,22 @@ normalisation (LN)** rescue the frozen-base mid layers - L2 least-squares at a f
    (0.87). The H1'/H2 regime that EXP-001 targets is only visible when the probe
    actually fits.
 
-8. **Not every linear method rescues the collapse.** RidgeClassifier(α=10)
-   (L2 least-squares) fails on mid layers (layer 6: 0.075) because α=10
-   over-regularises the tiny-variance frozen-base features (X^T X eigenvalues
-   ~1e-6-0.3, α dominates by 28x-2.4e6x). CE optimisation (LBFGS) and feature
-   normalisation (LN) rescue; fixed-α L2 least-squares does not. A paper using
-   the same α=10 avoided this because its backbone was task-fine-tuned (well-
-   scaled features), not the frozen base.
+8. **Closed-form least-squares rescues the collapse; first-order CE and over-regularised
+   Ridge do not.** RidgeClassifier(α=10) fails on frozen-base mid layers (L6: 0.075) because
+   α=10 is ~5 orders of magnitude too large for the feature scale (X^T X eigenvalues
+   ~1e-6-0.3). But sweeping α down to 1e-6 (≈OLS) recovers L6 to 0.917 on the *same* cache -
+   better than 30-epoch LBFGS (0.41) and LN+AdamW (0.65). The mid-layer signal is fully
+   linearly recoverable in closed form; the collapse only defeats first-order gradient
+   methods (AdamW/SGD) and mis-scaled L2. A paper using α=10 avoided this because its
+   backbone was task-fine-tuned (well-scaled features). *(Revises the original 03f framing,
+   which only swept α≥0.1.)*
+
+9. **The "collapse" is a probe-methodology artefact, not a feature property.** With OLS,
+   frozen-base mid layers L7-L10 reach ≈0.94 val acc, slightly *exceeding* L12 (≈0.90). The
+   inter-sample-std collapse (≈2e-4) is real but does not prevent linear recovery - it only
+   prevents first-order CE from converging. This directly supports the EXP-001 hypothesis
+   regime (H1'/H2: mid layers non-inferior or superior) *provided the probe fits*, and means
+   any "mid layers are unprobeable" conclusion from a plain-AdamW probe is a false negative.
 
 ## Interpretation, alternatives, limitations
 
@@ -341,7 +409,17 @@ normalisation (LN)** rescue the frozen-base mid layers - L2 least-squares at a f
   LBFGS is the purer "linear probe" (no nonlinearity) but is full-batch and
   slower, and is somewhat weaker on the most-collapsed layer (layer 6: 0.41 vs
   LN's 0.65 on the frozen backbone).
-- A fixed cross-sample standardisation (linear, non-learned) is a third option
+- **A third, stronger remedy: closed-form OLS / Ridge(α≈1e-6) (task 03g).** This
+  gives the best frozen-base mid-layer accuracy (L6: 0.917, L7-10: ≈0.94), beating
+  both LN+AdamW (0.65) and the 30-epoch LBFGS run (0.41). Caveat for EXP-001: OLS
+  optimises MSE on one-hot, so its raw scores are not calibrated probabilities -
+  it serves accuracy but not directly the NLL/ECE/D_JS recoverability metrics,
+  which need a softmax-CE probe. The 30-epoch LBFGS number is likely
+  under-converged (CE is convex in the linear weights, so a fully-converged CE
+  probe should close some of the gap to OLS); a tuned LBFGS schedule or an
+  OLS-initialised CE fine-tune would test this and is the cleanest way to get
+  both high accuracy and calibrated probabilities.
+- A fixed cross-sample standardisation (linear, non-learned) is another option
   that would keep the probe strictly linear; it was not run here and is left as a
   follow-up.
 - Limitations: single seed (17) for the diagnostics; representative-layer grids
@@ -352,25 +430,36 @@ normalisation (LN)** rescue the frozen-base mid layers - L2 least-squares at a f
 
 ## Decision
 
-- **EXP-001 mainline must use a probe that actually fits.** Adopt **LN head +
-  AdamW (lr=1e-2)** as the default probe for the recoverability experiment (all
-  12 layers fittable on the frozen backbone; cheapest integration; mid layers
-  become competitive with the final layer, enabling H1'/H2). Record the
-  head-type change and lr in the resolved run config. Keep the frozen-backbone
-  regime (not FT) so that enough final-layer errors remain for class-wise
-  recoverability.
-- The variance-collapse finding is recorded as a standalone methodological result
-  (this report): *first-order linear probing of frozen transformer mid-layer CLS
-  yields false negatives due to ill-conditioning; use second-order optimisation
-  or feature normalisation.*
+- **EXP-001 mainline must use a probe that actually fits** - a plain-AdamW linear probe
+  gives false negatives on mid layers (observation 9). Task 03g raises the bar: OLS shows
+  the frozen-base mid layers are recoverable to ≈0.94 (L7-10) / 0.917 (L6), so the chosen
+  probe should approach that ceiling, not stop at LN+AdamW's 0.65.
+- **The probe must also yield calibrated probabilities**, because the recoverability
+  metrics (NLL, ECE, D_JS^class) need softmax-CE outputs. Pure OLS optimises MSE on
+  one-hot and does not give calibrated scores, so it cannot serve the metric suite
+  directly.
+- **Leading candidate (untested): OLS-initialised CE fine-tune** - initialise the linear
+  head from the Ridge(α=1e-6) solution, then short CE fine-tune. Should inherit OLS's
+  ≈0.92 mid-layer accuracy *and* produce calibrated probabilities. A fully-converged CE
+  probe (more LBFGS epochs, or LBFGS from the OLS init) is the principled way to check
+  whether the 30-epoch LBFGS gap to OLS was just under-convergence.
+- **Fallback if the above is inconvenient: LN head + AdamW (lr=1e-2)** (the pre-03g
+  recommendation). It fits every layer and gives probabilities, but understates mid-layer
+  recoverability (L6: 0.65 vs OLS 0.917), which would bias the H1'/H2 layer comparison
+  toward the final layer.
+- The variance-collapse finding is recorded as a standalone methodological result (this
+  report): *frozen transformer mid-layer CLS is variance-collapsed but fully
+  linearly recoverable in closed form; first-order CE probing yields false negatives.
+  Use a closed-form / second-order solve or feature normalisation.*
 
 ## Next action
 
-1. Amend the EXP-001 protocol: `head_type: layernorm + linear_with_bias`,
-   `learning_rate: 1e-2` (frozen-backbone), and re-run the (LN-head) lr smoke test
-   to confirm 1e-2 is selected.
-2. Proceed with the 12-layer × 10-seed frozen-backbone recoverability run using
-   the LN head, then compute R_l / R_{l,c} / oracle / D_JS and the H1/H1'/H2
-   judgements.
-3. (Optional follow-up) test fixed cross-sample standardisation as a strictly
-   linear alternative to LN.
+1. **Resolve the probe choice (user decision).** Either (a) implement and smoke-test the
+   OLS-init + CE fine-tune probe, or (b) re-run LBFGS to convergence (more epochs / from
+   OLS init) to see if CE closes the gap to OLS, or (c) fall back to LN head + AdamW
+   (lr=1e-2). The choice trades accuracy ceiling against calibration and integration cost.
+2. Once the probe is fixed, re-run the (probe-specific) lr smoke test, then the 12-layer ×
+   10-seed frozen-backbone recoverability run, and compute R_l / R_{l,c} / oracle / D_JS
+   and the H1/H1'/H2 judgements.
+3. (Optional follow-up) test fixed cross-sample standardisation as a strictly-linear,
+   non-learned feature transform feeding a CE probe.
