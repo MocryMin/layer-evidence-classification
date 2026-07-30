@@ -221,6 +221,21 @@ LBFGS navigates the badly-conditioned landscape (dominated by the near-constant 
 first-order methods cannot. Layer 6 - the most collapsed - is only partially recoverable by LBFGS
 (0.41, vs LN's 0.65), consistent with it carrying the weakest linear signal.
 
+### Additional control - fp16 precision is not the cause
+
+The shared cache stores hidden states in float16. Since the mid-layer signal is tiny
+(layer 6 inter-sample std ≈ 2.0e-4), fp16 quantisation could in principle erode it. Control
+test on layer 6, plain AdamW probe (lr=1e-2, 100 epochs, seed 17):
+
+| features | best val acc |
+|----------|-------------:|
+| fp16-cached (loaded as fp32) | 0.0273 |
+| fp32-fresh (re-forwarded, no fp16 storage) | 0.0273 |
+
+Identical. Mean |fp16 - fp32| = 2.9e-6, i.e. 1.4% of the signal magnitude (2.0e-4); fp16 preserves
+the signal. The collapse is not a precision artefact; it is the conditioning/optimisation issue
+above. (Data: `03e_fp16_control/` - result logged here; recompute via the snippet in the report PR.)
+
 ## Observations
 
 1. **The collapse is real and structural.** Frozen DeBERTa-v3-base mid-layer CLS
