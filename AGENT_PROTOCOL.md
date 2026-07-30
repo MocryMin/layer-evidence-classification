@@ -225,11 +225,12 @@ Use each record for one purpose:
 For experiments used in decisions, reports, or RP claims, create:
 
 ```text
-reports/experiments/<experiment_id>.md
+agent-BuildReports/experiments/<experiment_id>.md
 ```
 
 Use the repository experiment-report template when present. Keep reports concise and separate:
 
+- AI reporting statement(report model version, for example: GLM-5.2/dsV4/GPT5.6-sol/...)
 - question;
 - setup;
 - results;

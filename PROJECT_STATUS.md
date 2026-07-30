@@ -5,18 +5,21 @@
 EXP-20260729-001 (mainline recoverability run) is **paused**: its pure-linear-probe
 protocol was found to give false negatives on mid layers. Diagnostic campaign
 EXP-20260729-002 characterised the cause and is **complete** (report at
-`reports/experiments/EXP-20260729-002--linear-probe-midlayer-collapse.md`).
+`agent-BuildReports/experiments/EXP-20260729-002--linear-probe-midlayer-collapse.md`).
 
 Key finding: frozen DeBERTa-v3-base mid-layer CLS has near-zero inter-sample
 variance (a near-constant component), so a plain linear probe under first-order
 AdamW/SGD collapses to near-random - but the class signal IS linearly
 extractable. The collapse is an ill-conditioning/optimisation artefact, not
-absence of signal. **Task 03g (RidgeClassifier α grid) upgraded this:** a
-closed-form least-squares solve at α≈1e-6 (OLS) recovers mid layers to 0.917
-(L6) / ≈0.94 (L7-10), beating every CE probe tried (LBFGS 0.41, LN+AdamW 0.65,
-plain AdamW 0.03) - so the "collapse" is a probe-methodology artefact, not a
-feature property. The prior 03f "Ridge fails" was an α-mis-scaling artefact
-(only tried α≥0.1). Prompt (with/without instruction) barely matters at α=1e-6.
+absence of signal. **Task 03g (RidgeClassifier α grid)** showed a closed-form
+least-squares solve at α≈1e-6 (OLS) recovers mid layers to 0.917 (L6) / ≈0.94
+(L7-10), beating every CE probe tried - so the "collapse" is a probe-methodology
+artefact, not a feature property. **Task 03h (Adam ablation)** decomposed the
+AdamW failure into four factors (none fundamental): mini-batch noise (dominant;
+batch=256 fails for every init/wd), wd=0.01 (caps acc at ≈0.55), no early
+stopping + overparameterised head (CE peaks at ep8 then overfits), and slow
+convergence from Xavier. **OLS-init + full-batch CE + early stop peaks at 0.919
+@ep8** (above OLS, with calibrated probabilities) - the tested probe for EXP-001.
 
 ## Latest valid result
 
@@ -29,6 +32,10 @@ EXP-002 diagnostics (seed 17, frozen backbone unless noted), validation accuracy
   0.917; layers 7-10 ≈0.94 > layer 12 ≈0.90).** Best linear accuracy on the
   frozen base. α=10 fails (over-regularised); best α is 1e-6 for all mid layers.
   Prompt-independent (with-prompt 0.917 vs no-prompt 0.912 at L6).
+- **Adam ablation (task 03h, layer 6):** mini-batch 256 fails for every init/wd
+  (OLS-init 0.917->0.61 wd0 / 0.023 wd0.01; Xavier 0.03-0.04). Full-batch rescues:
+  OLS-init + full-batch CE peaks **0.919 @ep8** (then overfits to 0.79 by 20k);
+  Xavier + full-batch wd=0 climbs to 0.70 @20k (still slow), wd=0.01 plateaus 0.55.
 - Removing the instruction prompt does not fix the collapse (intrinsic to the backbone).
 - Full-FT backbone: last layer 0.967 test acc (too few errors for class-wise
   recoverability); FT does not fix mid-layer collapse but LN on the FT backbone
@@ -37,22 +44,19 @@ EXP-002 diagnostics (seed 17, frozen backbone unless noted), validation accuracy
 ## Active blockers
 
 None for the diagnostics. EXP-001 mainline needs a protocol amendment before
-resuming (see decision). **Probe choice reopened by 03g**: OLS gives the best
-mid-layer accuracy but no calibrated probabilities (the recoverability metrics
-NLL/ECE/D_JS need a softmax-CE probe). Candidate: OLS-init + CE fine-tune (untested).
+resuming (see decision). Probe choice now resolved by 03h: **OLS-init + full-batch
+CE + early stopping** (tested at 0.919 @ep8 on L6, gives calibrated probabilities).
 
 ## Next action
 
-Resolve the probe choice (user decision): (a) OLS-init + CE fine-tune, (b) CE
-probe run to convergence (more LBFGS epochs / from OLS init) to test whether CE
-closes the gap to OLS, or (c) fall back to LN head + AdamW (lr=1e-2, fits all
-layers but understates mid-layer recoverability at L6: 0.65 vs OLS 0.917). Then
-re-run the probe-specific lr smoke test and proceed with the 12-layer x 10-seed
-recoverability run and H1/H1'/H2 judgement.
+Implement the OLS-init + full-batch CE + early-stop probe in `src/` (OLS init via
+Ridge α=1e-6; full-batch CE; wd≈0; early-stop on val acc, record peak epoch), with
+a unit test. Then re-run the probe-specific lr smoke test and proceed with the
+12-layer x 10-seed recoverability run and H1/H1'/H2 judgement.
 
 ## Important paths
 
-- `reports/experiments/EXP-20260729-002--linear-probe-midlayer-collapse.md` - diagnostic report
+- `agent-BuildReports/experiments/EXP-20260729-002--linear-probe-midlayer-collapse.md` - diagnostic report
 - `artifacts/EXP-20260729-002/` - diagnostic data (gitignored; README documents layout)
 - `artifacts/EXP-20260729-001/cache/` - shared frozen-backbone CLS cache
 - `configs/diag_config.yaml` - EXP-002 config; `configs/exp_config.yaml` - EXP-001 config
