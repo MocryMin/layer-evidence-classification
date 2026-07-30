@@ -394,7 +394,11 @@ Remove them (full-batch + wd≈0 + early stop + OLS init) and CE recovers the mi
    final layer), with a dominant near-constant component (within-sample std
    0.07-0.24, participation ratio 1-3.5 for layers 1-6). The CLS vector has a
    fixed "shape" that is nearly identical across samples; the class signal lives
-   in tiny per-sample deviations.
+   in tiny per-sample deviations. Feature stats + per-layer probe accuracy
+   (plain AdamW / LBFGS / OLS / LN) are merged in
+   `02_variance_collapse/per_layer_collapse_summary.json`; the faithful 12-layer
+   x 10-seed plain-AdamW collapse curve (lr=1e-3, reproducing `smoke_lr_results.json`
+   on seed-17 {1,6,12}) is in `artifacts/EXP-20260729-001/plain_probe_mainline/`.
 
 2. **But the signal is present and linearly extractable.** LBFGS (plain linear
    head, no feature transform) fits every layer to 0.41-0.86 (layer 1: 0.135 ->

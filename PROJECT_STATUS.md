@@ -25,9 +25,17 @@ convergence from Xavier. **OLS-init + full-batch CE + early stop peaks at 0.919
 
 EXP-002 diagnostics (seed 17, frozen backbone unless noted), validation accuracy:
 - Plain linear probe (AdamW, best lr 1e-2): layers 1/6 fail (0.13/0.03), layer 12 = 0.79.
+- **EXP-001 mainline plain probe (lr=1e-3, 10 seeds, 100ep - post-hoc, saved):**
+  full 12-layer collapse curve. Mid layers 4-8 near-random (L6 0.026 ± 0.002,
+  L8 0.035), L12 0.608 ± 0.003; small std => collapse is seed-robust. Test tracks
+  val. (`artifacts/EXP-20260729-001/plain_probe_mainline/results.json`; reproduces
+  `smoke_lr_results.json` on seed-17 {1,6,12}.)
 - LBFGS plain probe (30 epochs): every layer 0.41-0.86 (layer 6: 0.03 -> 0.41; layer 3 > layer 12).
 - LN head (AdamW, 1e-2): every layer 0.65-0.90 (layer 6: 0.65; layers 7/10 > layer 12).
 - norm-only fails on mid layers; affine-only rescues mild layers but not severe ones.
+- **Feature stats + acc per layer in one table:**
+  `artifacts/EXP-20260729-002/02_variance_collapse/per_layer_collapse_summary.json`
+  (inter_std / participation_ratio / top1 + plain-AdamW / LBFGS / OLS / LN acc).
 - **RidgeClassifier α=1e-6 (≈OLS, task 03g): every layer 0.79-0.94 (layer 6:
   0.917; layers 7-10 ≈0.94 > layer 12 ≈0.90).** Best linear accuracy on the
   frozen base. α=10 fails (over-regularised); best α is 1e-6 for all mid layers.
