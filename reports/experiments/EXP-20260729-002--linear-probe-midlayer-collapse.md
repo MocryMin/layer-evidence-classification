@@ -236,6 +236,39 @@ Identical. Mean |fp16 - fp32| = 2.9e-6, i.e. 1.4% of the signal magnitude (2.0e-
 the signal. The collapse is not a precision artefact; it is the conditioning/optimisation issue
 above. (Data: `03e_fp16_control/` - result logged here; recompute via the snippet in the report PR.)
 
+### Additional control - RidgeClassifier (paper comparison)
+
+A prior paper used ProtectAI's `DeBERTa-v3-base-prompt-injection-v2` with a mid-layer **linear
+`RidgeClassifier(alpha=10)`** and did not encounter this collapse. Reproduced on our frozen-base
+cache, plain CLS, all 12 layers (val acc; `03f_ridge/ridge_results.json`):
+
+| layer | Ridge(α=10) | plain AdamW | LBFGS | LN |
+|------:|------------:|------------:|------:|---:|
+| 6  | 0.075 | 0.027 | 0.410 | 0.651 |
+| 7  | 0.421 | 0.064 |  -    | 0.901 |
+| 8  | 0.389 | 0.028 |  -    | 0.831 |
+| 11 | 0.763 | 0.801 |  -    | 0.867 |
+| 12 | 0.778 | 0.789 | 0.812 | 0.870 |
+
+**Ridge(α=10) does NOT rescue the mid layers** (layer 6: 0.075, far below LBFGS 0.41 / LN 0.65),
+and underperforms plain AdamW on upper layers. `fit_intercept` (centering) makes no difference -
+the bottleneck is not the constant component. Layer-6 α sweep: 0.1 -> 0.189, 1 -> 0.086, 10 ->
+0.075, 100 -> 0.073, 1000 -> 0.071 (lower α helps but even α=0.1 stays poor).
+
+**Root cause - α is mis-scaled for the frozen-base features.** Layer-6 `X^T X` (centered)
+eigenvalues: top1 = 0.354, median = 4.2e-6, sum = 0.576. With α=10 the regulariser dominates the
+signal directions by 28x (top1) to 2.4e6x (median); the ridge shrinkage factor
+λ/(λ+α) retains only 3.4% of the top direction and ~0% of the rest - the signal is regularised
+away. LBFGS (cross-entropy) and LN (feature normalisation) do not apply this L2 shrinkage, so they
+recover the signal.
+
+**Why the paper did not hit this.** `DeBERTa-v3-base-prompt-injection-v2` is a *task-fine-tuned*
+model. Per task 3c, fine-tuning inflates the feature scale by ~40x (layer 12 inter-sample std
+0.020 -> 0.875), so `X^T X` eigenvalues become O(10^2-10^3) and α=10 is appropriately scaled. The
+collapse is specific to the *frozen base*; on a fine-tuned backbone Ridge(α=10) works fine. This
+also means: of the linear methods tested, only **cross-entropy optimisation (LBFGS) or feature
+normalisation (LN)** rescue the frozen-base mid layers - L2 least-squares at a fixed α does not.
+
 ## Observations
 
 1. **The collapse is real and structural.** Frozen DeBERTa-v3-base mid-layer CLS
@@ -284,6 +317,14 @@ above. (Data: `03e_fp16_control/` - result logged here; recompute via the snippe
    layer 3 (0.862) > layer 12 (0.812); with LN, layers 7/10 (0.90) > layer 12
    (0.87). The H1'/H2 regime that EXP-001 targets is only visible when the probe
    actually fits.
+
+8. **Not every linear method rescues the collapse.** RidgeClassifier(α=10)
+   (L2 least-squares) fails on mid layers (layer 6: 0.075) because α=10
+   over-regularises the tiny-variance frozen-base features (X^T X eigenvalues
+   ~1e-6-0.3, α dominates by 28x-2.4e6x). CE optimisation (LBFGS) and feature
+   normalisation (LN) rescue; fixed-α L2 least-squares does not. A paper using
+   the same α=10 avoided this because its backbone was task-fine-tuned (well-
+   scaled features), not the frozen base.
 
 ## Interpretation, alternatives, limitations
 
