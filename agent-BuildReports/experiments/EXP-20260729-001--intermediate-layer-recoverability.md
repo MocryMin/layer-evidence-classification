@@ -55,14 +55,30 @@ Then we pre-computed all the hidden states, used AdamW and trained the $W_E^L$. 
 
 ### 6.1 LN diagnosis
 
-| layer | plain AdamW (lr=1e-3, 10 seeds) | LN head (AdamW lr=1e-2, seed 17) |
-|---:|---:|---:|
-| 1 | 0.071 | 0.806 |
-| 4 | 0.064 | 0.730 |
-| 6 | 0.026 | 0.651 |
-| 8 | 0.035 | 0.831 |
-| 12 | 0.608 | 0.870 |
+To isolate the effect of the head, plain and LN are compared under a **matched
+control** (same lr, seed, epochs, wd, batch; only the head differs):
 
-> `Corresponding artifact path: ../EXP-20260729-002/03a_ln_ablation/ln_ablation_lr1e-2.json` (LN head = `LayerNorm` over the 768-dim CLS + linear classifier; all other hyperparameters match the plain probe).
+| layer | plain AdamW (val acc) | LN head (val acc) | plain NLL | LN NLL |
+|---:|---:|---:|---:|---:|
+| 1 | 0.135 | 0.806 | 4.388 | 0.816 |
+| 4 | 0.081 | 0.730 | 4.705 | 1.247 |
+| 6 | 0.027 | 0.651 | 4.985 | 1.906 |
+| 8 | 0.028 | 0.831 | 4.985 | 0.903 |
+| 12 | 0.789 | 0.870 | 0.994 | 0.608 |
+
+> `Matched control: lr=1e-2, seed 17, 100 epochs, wd=0.01, batch=256, AdamW.` Both
+> columns are from the same run (`../EXP-20260729-002/03a_ln_ablation/ln_ablation_lr1e-2.json`);
+> only the head differs (`linear_with_bias` vs `LayerNorm(768) + linear`). The plain
+> column here (lr=1e-2) differs from the mainline collapse table in §6 (lr=1e-3) -
+> see note below.
+
+> `Note on lr.` The §6 mainline uses lr=1e-3 (selected by the smoke test). The §6.1
+> matched control uses lr=1e-2 because the LN-head probe needs a larger step to move
+> off the collapsed features, and a single lr is required for a controlled plain-vs-LN
+> comparison. The plain probe collapses at both lr (§6.1 plain at 1e-2: L6 0.027,
+> matching the §6 1e-3 result 0.026 within seed noise), so the choice of 1e-2 does not
+> mask the collapse - it is the fairer lr for the LN head and keeps the comparison
+> single-variable.
 
 **Parameter count:** the `linear_with_bias` head has $768{\times}150 + 150 = 115{,}350$ parameters. The LN head adds `LayerNorm(768)` ($\gamma + \beta$) = $1{,}536$ parameters, i.e. **1.3% of the head**.
+
