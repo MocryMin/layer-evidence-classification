@@ -6,7 +6,7 @@
 - **Date**: 2026-07-29
 - **State**: COMPLETE (diagnostic campaign; EXP-20260729-001 mainline paused)
 - **Parent**: EXP-20260729-001
-- **Git commit**: `8c2a39b` (dirty: EXP-002 artifact data under gitignored `artifacts/`)
+- **Git commit**: `72a89f5` (dirty: EXP-002 artifact data under gitignored `artifacts/`)
 - **MLflow experiment**: `EXP-20260729-002` (`sqlite:///mlruns.db`)
   - FINISHED runs: `lr_grid` (cd6fea47), `optimizer` (38d2497a), `no_prompt`
     (d91a96ac), `ft_backbone` (af5a82f6). The `ln_ablation` MLflow run FAILED
