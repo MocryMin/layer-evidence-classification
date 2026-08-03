@@ -60,6 +60,12 @@ EXP-002 diagnostics (seed 17, frozen backbone unless noted), validation accuracy
   fails even at L12. The uniform attractor is NOT ReLU-specific - it is a
   property of the near-constant features; only the 1-layer bias-carrying head
   escapes it.
+- **Token-position check (task 06): the compression is CLS-specific.** On a
+  2000-sample subset (CLS values reproduce full-set stats), non-CLS tokens
+  have healthy inter-sample std at every layer - at L6 (CLS 2e-4) all non-CLS
+  positions are >= 0.11 (500-2000x larger, zero compressed positions). The
+  mid-layer representation space is NOT collapsed; only the CLS pooling token
+  is. Follow-up: mean-pooling readout may escape the collapse.
 - Removing the instruction prompt does not fix the collapse (intrinsic to the backbone).
 - Full-FT backbone: last layer 0.967 test acc (too few errors for class-wise
   recoverability); FT does not fix mid-layer collapse but LN on the FT backbone

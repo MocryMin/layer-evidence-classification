@@ -498,6 +498,34 @@ only the 1-layer head escapes via its bias. Removing the constant component
 (centering, task 04) or using a closed-form solve (OLS, task 03g) remains the
 only working remedies.
 
+### Task 06 - Token-position check: the compression is CLS-specific
+
+All collapse statistics so far are computed on the CLS token only. This
+re-forwards the frozen backbone (identical config: instruction prompt, left
+truncation, max_length 512) on a 2000-sample train subset and measures the
+per-position inter-sample std (padding excluded, positions with >= 300
+effective samples). Data: `06_token_variance/token_variance_check.json`.
+The 2000-sample CLS values reproduce the full-set stats (L6 0.00018 vs
+0.000203; L12 0.0202 vs 0.0203), so the sample is representative.
+
+| layer | CLS inter-std | non-CLS positions: min / median / max |
+|------:|--------------:|---------------------------------------|
+| 1 | 0.0035 | 0.020 / 0.51 / 0.57 |
+| 6 | 0.0002 | 0.11 / 0.39 / 0.43 |
+| 12 | 0.020 | 0.25 / 0.60 / 0.63 |
+
+**The variance compression is CLS-specific - it does not exist on other
+tokens.** At L6 (the most collapsed layer for CLS), every non-CLS position has
+inter-sample std >= 0.11, i.e. 500-2000x the CLS's 2e-4; the share of
+compressed (< 5e-4) non-CLS positions is exactly 0. The non-CLS tokens also
+carry larger magnitude (L6 mean norm 12-15 vs CLS 4.1). So the mid-layer
+representation space is *not* collapsed: the per-token representations retain
+healthy sample variance, and the collapse is a property of the CLS pooling
+token alone. (CLINC150 utterances are short - max seq len 32 - so positions
+beyond ~17 have too few effective samples to report.) A corollary worth
+testing: a non-CLS readout (e.g. mean-pooling) may escape the collapse
+entirely - left as a follow-up.
+
 ## Observations
 
 1. **The collapse is real and structural.** Frozen DeBERTa-v3-base mid-layer CLS
@@ -604,6 +632,15 @@ only working remedies.
     even at L12 (0.073 vs plain 0.789). The attractor is a property of the
     near-constant features (shared logits -> aligned gradient), not of ReLU;
     only the 1-layer bias-carrying head escapes it.
+
+13. **The compression is CLS-specific, not a general mid-layer property
+    (task 06).** A per-token-position check (2000-sample subset, identical
+    config; CLS values reproduce the full-set stats) shows non-CLS tokens have
+    healthy inter-sample std at every layer - at L6 (CLS 2e-4) every non-CLS
+    position is >= 0.11 (500-2000x larger; zero compressed positions). The
+    mid-layer representation space is not collapsed; only the CLS pooling
+    token is. A non-CLS readout (e.g. mean-pooling) may escape the collapse -
+    listed as a follow-up.
 
 ## Interpretation, alternatives, limitations
 
