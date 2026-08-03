@@ -387,6 +387,56 @@ at **0.919 @ep8** with calibrated softmax probabilities - slightly *better* than
 fundamentally incapable; the original protocol stacked all four failure modes at once.
 Remove them (full-batch + wd≈0 + early stop + OLS init) and CE recovers the mid layer.
 
+### Task 04 - MLP probe (nonlinear-capacity control)
+
+Is the collapse a *linearity* limitation? A single-hidden-layer MLP probe
+(`Linear(768,r) + ReLU + Linear(r,150)`, 919r params, second layer bias-free)
+trained identically to the 03a plain/LN comparison (lr=1e-2 unified, seed 17,
+100ep, batch 256, wd=0.01, grad_clip=1.0, AdamW). r=128 matches the plain
+head's 115,350 params within +2% (117,632); r=64/256 bracket it (-49%/+104%).
+Data: `04_mlp_probe/mlp_probe_lr1e-2.json`.
+
+**On the raw features the MLP fails on EVERY layer - including L12, where plain
+gets 0.789.** Val acc per layer (r=128; all three r fail likewise):
+
+| layer | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 |
+|------:|--:|--:|--:|--:|--:|--:|--:|--:|--:|---:|---:|---:|
+| raw MLP | 0.007 | 0.011 | 0.040 | 0.007 | 0.007 | 0.007 | 0.007 | 0.007 | 0.007 | 0.007 | 0.274 | 0.007 |
+
+The training loss converges to exactly ln(150)=5.011 (uniform predictions) by
+epoch ~5 and stays there; val acc is 1/150 chance. A full lr check on L6
+(lr in {1e-3, 1e-2, 1e-1} x r in {64,128,256}) gives 0.007 in all 9 cells, so
+this is not an lr artefact. The implementation is verified correct: the same
+`MLPHead` reaches acc=1.0 on separable synthetic class means within 2 epochs.
+
+**Mechanism - the constant CLS component + ReLU = uniform-prediction attractor.**
+The near-constant CLS (inter-sample std 2e-4 at L6; even at L12 the constant
+part is ~1000x the signal) makes the hidden activations a fixed per-unit offset
+plus a tiny signal. The CE gradient then drives the per-class logit offsets
+toward equal (loss -> ln(150)); at the uniform point the gradient is exactly
+zero on balanced data and the dead-ReLU units (zero gradient) lock the network
+there forever. A one-layer head escapes this because its bias absorbs the
+constant offset; the ReLU MLP cannot.
+
+**Centering the features (fixed cross-sample mean subtraction, no leakage)
+removes the attractor - and then the MLP rescues the mid layers:**
+
+| layer | raw plain (03a) | centered plain | centered MLP r=64 | r=128 | r=256 |
+|------:|----------------:|---------------:|------------------:|------:|------:|
+| 4 | 0.081 | 0.404 | 0.638 | 0.748 | 0.780 |
+| 6 | 0.027 | 0.317 | 0.626 | 0.659 | 0.737 |
+| 7 | 0.063 | 0.732 | 0.853 | 0.893 | **0.913** |
+| 10 | 0.174 | 0.760 | 0.854 | 0.885 | 0.903 |
+| 12 | 0.789 | 0.879 | 0.861 | 0.869 | 0.878 |
+
+Centered plain alone improves L6 0.027 -> 0.317 (a strictly-linear fix, cf. the
+follow-up "fixed cross-sample standardisation"); the ReLU MLP adds real value
+on top (L6 0.317 -> 0.737; L7 r=256 = 0.913 *exceeds* L12), monotonically in r.
+But even so, the closed-form **OLS on raw features (0.917 at L6) still beats the
+best centered MLP (0.737)** - the collapse is not a linearity limitation; the
+linear signal is there, and the first-order training recipe (mini-batch 256,
+wd=0.01, 100ep) still caps the MLP below the closed-form solve.
+
 ## Observations
 
 1. **The collapse is real and structural.** Frozen DeBERTa-v3-base mid-layer CLS
@@ -469,6 +519,19 @@ Remove them (full-batch + wd≈0 + early stop + OLS init) and CE recovers the mi
     so first-order CE is *not* incapable; the original protocol stacked all four failure
     modes at once. *(Refines observation 9: CE can fit the mid layer given full-batch + low
     wd + early stopping.)*
+
+11. **Nonlinear capacity does not fix the collapse; the constant component kills
+    the ReLU MLP outright (task 04).** A matched-parameter MLP (919r; r=128 ≈ plain's
+    115,350) trained identically to plain collapses to uniform predictions on *every*
+    layer - including L12, where plain gets 0.789 - at every lr (1e-3..1e-1) and r. The
+    near-constant CLS component plus ReLU forms a uniform-prediction attractor (logits
+    equalise, gradient hits exactly zero on balanced data, dead ReLUs lock it in); a
+    one-layer head escapes via its bias, a ReLU MLP cannot. Centering the features
+    (fixed cross-sample mean subtraction) removes the attractor: centered plain reaches
+    L6 0.317, centered MLP r=256 reaches **L6 0.737** and L7 0.913 (> L12) - but OLS
+    on raw features (L6 0.917) still wins. The collapse is *not* a linearity
+    limitation; the linear signal is fully extractable (OLS), and adding nonlinear
+    capacity only pays off after a (linear) centring fix.
 
 ## Interpretation, alternatives, limitations
 

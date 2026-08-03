@@ -44,6 +44,12 @@ EXP-002 diagnostics (seed 17, frozen backbone unless noted), validation accuracy
   (OLS-init 0.917->0.61 wd0 / 0.023 wd0.01; Xavier 0.03-0.04). Full-batch rescues:
   OLS-init + full-batch CE peaks **0.919 @ep8** (then overfits to 0.79 by 20k);
   Xavier + full-batch wd=0 climbs to 0.70 @20k (still slow), wd=0.01 plateaus 0.55.
+- **MLP probe (task 04):** matched-parameter MLP (919r, r=128 ~= plain params)
+  fails on EVERY layer incl. L12 (uniform-prediction collapse, all lr/r) - the
+  constant CLS component + ReLU forms a uniform attractor. Centering the features
+  (fixed linear transform) rescues: centered plain L6 0.317, centered MLP r=256
+  L6 0.737 / L7 0.913 > L12 - but OLS (0.917 L6) still wins. Collapse is NOT a
+  linearity limitation.
 - Removing the instruction prompt does not fix the collapse (intrinsic to the backbone).
 - Full-FT backbone: last layer 0.967 test acc (too few errors for class-wise
   recoverability); FT does not fix mid-layer collapse but LN on the FT backbone
