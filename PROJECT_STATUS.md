@@ -46,10 +46,20 @@ EXP-002 diagnostics (seed 17, frozen backbone unless noted), validation accuracy
   Xavier + full-batch wd=0 climbs to 0.70 @20k (still slow), wd=0.01 plateaus 0.55.
 - **MLP probe (task 04):** matched-parameter MLP (919r, r=128 ~= plain params)
   fails on EVERY layer incl. L12 (uniform-prediction collapse, all lr/r) - the
-  constant CLS component + ReLU forms a uniform attractor. Centering the features
-  (fixed linear transform) rescues: centered plain L6 0.317, centered MLP r=256
-  L6 0.737 / L7 0.913 > L12 - but OLS (0.917 L6) still wins. Collapse is NOT a
-  linearity limitation.
+  constant CLS component + ReLU forms a uniform attractor. Dead-ReLU diagnosis:
+  features are predominantly POSITIVE (L6: 85% dims mu-delta>0) - the pervasive
+  dead ReLU (46% -> 100% within epoch 1, batch 29/58) is driven by shared
+  logits across samples (|logits[0]-logits[1]|=0) -> aligned gradient, not by
+  negative features. Centering the features (fixed linear transform) rescues:
+  centered plain L6 0.317, centered MLP r=256 L6 0.737 / L7 0.913 > L12 - but
+  OLS (0.917 L6) still wins. Collapse is NOT a linearity limitation.
+- **Activation ablation (task 05):** none/relu/leaky/gelu all fail on raw
+  features (L6 best 0.007-0.010, all r). relu/gelu dead-lock at uniform
+  (loss=ln(150), neg=1.00); leaky stalls 0.8 within uniform (slope too weak);
+  2-layer linear (no act) cannot dead-lock but diverges (loss 7.9-47.6) and
+  fails even at L12. The uniform attractor is NOT ReLU-specific - it is a
+  property of the near-constant features; only the 1-layer bias-carrying head
+  escapes it.
 - Removing the instruction prompt does not fix the collapse (intrinsic to the backbone).
 - Full-FT backbone: last layer 0.967 test acc (too few errors for class-wise
   recoverability); FT does not fix mid-layer collapse but LN on the FT backbone

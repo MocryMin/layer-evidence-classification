@@ -94,6 +94,41 @@ class MLPHead(nn.Module):
         return self.fc2(self.act(self.fc1(x)))
 
 
+class ActHead(nn.Module):
+    """MLP probe with configurable activation (activation ablation, task 05).
+
+    ``z = W2 * act(W1 x + b1) + b2`` - both layers carry a bias (919r + 150
+    params at hidden=r). ``act`` in {``none``, ``relu``, ``leaky``, ``gelu``}
+    (LeakyReLU negative_slope=0.01, GELU exact). Used to test whether the
+    ReLU dead-unit lock-in is specific to ReLU: ``none`` cannot dead-lock at
+    all (pure 2-layer linear), ``leaky``/``gelu`` keep a gradient through the
+    negative interval. Initialisation follows the other heads.
+    """
+
+    def __init__(self, in_dim: int = 768, n_classes: int = 150, hidden: int = 128,
+                 act: str = "none"):
+        super().__init__()
+        self.act_name = act
+        self.fc1 = nn.Linear(in_dim, hidden, bias=True)
+        self.fc2 = nn.Linear(hidden, n_classes, bias=True)
+        _init_linear(self.fc1)
+        nn.init.xavier_uniform_(self.fc2.weight)
+        nn.init.zeros_(self.fc2.bias)
+        if act == "none":
+            self.act = nn.Identity()
+        elif act == "relu":
+            self.act = nn.ReLU()
+        elif act == "leaky":
+            self.act = nn.LeakyReLU(negative_slope=0.01)
+        elif act == "gelu":
+            self.act = nn.GELU()
+        else:
+            raise ValueError(f"unknown activation {act}")
+
+    def forward(self, x):
+        return self.fc2(self.act(self.fc1(x)))
+
+
 def build_head(head_type: str, in_dim: int = 768, n_classes: int = 150) -> nn.Module:
     cls = {
         "plain": PlainHead,
@@ -101,5 +136,6 @@ def build_head(head_type: str, in_dim: int = 768, n_classes: int = 150) -> nn.Mo
         "norm_only": NormOnlyHead,
         "affine_only": AffineOnlyHead,
         "mlp": MLPHead,
+        "act": ActHead,
     }[head_type]
     return cls(in_dim, n_classes)

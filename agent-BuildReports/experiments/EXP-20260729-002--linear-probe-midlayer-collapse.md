@@ -457,6 +457,47 @@ all ReLU units at once. Dead network -> logits = second-layer bias (uniform)
 -> loss = ln(150) -> gradient exactly zero on balanced data -> permanently
 locked.
 
+### Task 05 - Activation ablation: the uniform attractor is not ReLU-specific
+
+Is the dead-lock specific to ReLU? Same structure ``z = W2 * act(W1 x + b1) + b2``
+(both biases, 919r+150 params) with act in {none, relu, leaky, gelu}, identical
+training (lr=1e-2, seed 17, 100ep, batch 256, wd=0.01, grad_clip=1.0). The
+``relu`` row here carries b2 for structure parity (task 04's ReLU MLP had it
+bias-free; +150 params, 0.13% - behaviour identical). Data:
+`05_act_ablation/act_ablation.json`. Best val acc (r=128) and final train loss
+range across layers:
+
+| act | L1 | L3 | L6 | L9 | L12 | final train loss (12 layers) |
+|-----|----:|---:|---:|---:|---:|-------------------------------|
+| none | 0.021 | 0.049 | 0.010 | 0.084 | 0.073 | 7.9 - 47.6 (diverges) |
+| relu | 0.007 | 0.007 | 0.007 | 0.007 | 0.007 | 5.012 = ln(150) (uniform) |
+| leaky | 0.015 | 0.018 | 0.007 | 0.007 | 0.022 | 4.92 - 5.81 (near-uniform) |
+| gelu | 0.007 | 0.013 | 0.007 | 0.007 | 0.007 | 5.011 - 5.019 (uniform) |
+
+**Every activation fails on the raw features**, and the capacity check (L6 x
+r in {64,128,256}) is uniformly 0.007-0.010. The failure modes differ:
+
+- **relu / gelu**: identical uniform collapse - the pre-activations are pushed
+  to the far-negative region, where both ReLU (exactly 0) and GELU (gelu'(x) ->
+  0 as x -> -inf) have vanishing gradient, so the network dead-locks at
+  logits=b2, loss=ln(150), neg-fraction 1.00.
+- **leaky(0.01)**: nearly the same - the negative slope keeps a tiny gradient
+  at the "dead" point, so the loss stalls at 5.00-5.13 (within 0.8 of
+  uniform) instead of locking exactly; val acc stays 0.007-0.022. The 0.01
+  slope is too weak to escape within 100 epochs.
+- **none (pure 2-layer linear)**: cannot dead-lock (neg-fraction ~0.5), yet
+  still fails everywhere - the train loss *diverges* (7.9-47.6, logits grow
+  unbounded) and val acc stays 0.010-0.084. A different failure mode
+  (optimisation instability of the 2-layer parameterisation at lr=1e-2), same
+  conclusion: the 2-layer probe cannot fit the raw features even at L12 where
+  the 1-layer plain head reaches 0.789.
+
+So the uniform-prediction attractor is **not a ReLU artifact**: it is the
+consequence of the near-constant CLS (shared logits -> aligned gradient), and
+only the 1-layer head escapes via its bias. Removing the constant component
+(centering, task 04) or using a closed-form solve (OLS, task 03g) remains the
+only working remedies.
+
 ## Observations
 
 1. **The collapse is real and structural.** Frozen DeBERTa-v3-base mid-layer CLS
@@ -552,6 +593,17 @@ locked.
     on raw features (L6 0.917) still wins. The collapse is *not* a linearity
     limitation; the linear signal is fully extractable (OLS), and adding nonlinear
     capacity only pays off after a (linear) centring fix.
+
+12. **The uniform attractor is not ReLU-specific (task 05).** The activation
+    ablation (none / relu / leaky / gelu, same 2-layer structure and training)
+    fails on the raw features for *every* activation, at every r on L6: relu and
+    gelu dead-lock at uniform (loss = ln(150), neg-fraction 1.00 - GELU's
+    gradient also vanishes as x -> -inf); leaky stalls within 0.8 of uniform
+    (the 0.01 slope is too weak to escape); the pure 2-layer linear cannot
+    dead-lock (neg ~0.5) but *diverges* (train loss 7.9-47.6) and still fails
+    even at L12 (0.073 vs plain 0.789). The attractor is a property of the
+    near-constant features (shared logits -> aligned gradient), not of ReLU;
+    only the 1-layer bias-carrying head escapes it.
 
 ## Interpretation, alternatives, limitations
 
