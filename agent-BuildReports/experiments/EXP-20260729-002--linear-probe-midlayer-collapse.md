@@ -437,6 +437,26 @@ best centered MLP (0.737)** - the collapse is not a linearity limitation; the
 linear signal is there, and the first-order training recipe (mini-batch 256,
 wd=0.01, 100ep) still caps the MLP below the closed-form solve.
 
+**Dead-ReLU diagnosis** (`04_mlp_probe/dead_relu_diagnosis.json`). The
+uniform collapse is accompanied by *universal* dead ReLUs, but **not** because
+the features are negative. Per-dim feature stats (mu = cross-sample mean,
+delta = std): the collapsed mid layers are *predominantly positive and
+sign-stable* - L6 has 84.8% of dims with mu-delta > 0 (almost-always
+positive), 14.3% with mu+delta < 0, and 99.1% with |mu| > delta (delta is
+tiny, ~2e-4). L12 (not collapsed) is the opposite: 50.4% negative, mixed
+signs. The initial dead fraction is ~46% at L6 (0.43-0.52 across layers) -
+that is just the random-sign W1 applied to a near-constant vector (~half the
+units land with W1 x + b1 < 0). Training then drives it to **100% within the
+first epoch** (L6: 46% -> 100% by batch 29/58 of epoch 1; pre-activation
+mean drifts +0.008 -> -0.574). The mechanism: because the features are
+near-constant, **all samples share identical logits at init (|logits[0] -
+logits[1]| = 0 exactly)**, so the prediction error (p - y) is the same for
+every sample and does not average out; the hidden layer receives a
+one-directional gradient that pushes every pre-activation negative, killing
+all ReLU units at once. Dead network -> logits = second-layer bias (uniform)
+-> loss = ln(150) -> gradient exactly zero on balanced data -> permanently
+locked.
+
 ## Observations
 
 1. **The collapse is real and structural.** Frozen DeBERTa-v3-base mid-layer CLS
