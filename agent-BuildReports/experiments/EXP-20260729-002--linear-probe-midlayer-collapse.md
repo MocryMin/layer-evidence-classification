@@ -89,9 +89,10 @@ i.e. undertrained - the plain probe is structurally hampered, not just mis-tuned
 ### Task 3a - LN ablation (plain / ln / norm_only / affine_only)
 
 All heads, AdamW, lr=1e-2, 100 epochs, seed 17, validation accuracy
-(`03a_ln_ablation/ln_ablation_lr1e-2.json`):
+(`03a_ln_ablation/ln_ablation_lr1e-2.json`; the inter-sample std column is the
+*raw* feature statistic, shared by all heads):
 
-| layer | plain | ln | norm_only | affine_only | inter-sample std |
+| layer | plain | ln | norm_only | affine_only | inter-sample std (raw) |
 |------:|------:|-----:|----------:|------------:|-----------------:|
 | 1  | 0.135 | 0.806 | 0.244 | 0.728 | 0.00364 |
 | 2  | 0.237 | 0.836 | 0.594 | 0.745 | 0.00127 |
@@ -106,15 +107,46 @@ All heads, AdamW, lr=1e-2, 100 epochs, seed 17, validation accuracy
 | 11 | 0.801 | 0.867 | 0.818 | 0.870 | 0.02454 |
 | 12 | 0.789 | 0.870 | 0.791 | 0.868 | 0.02035 |
 
+Each head is itself a feature transform, so the *transformed* inter-sample std
+differs per head. Re-trained identically (seed 17, lr=1e-2, 100ep) and
+measured with the trained transformation parameters
+(`03a_ln_ablation/transformed_feature_stats.json`):
+
+| layer | plain (=raw) | ln | norm_only | affine_only |
+|------:|-------------:|-----:|----------:|------------:|
+| 4  | 0.00055 | 0.01794 | 0.00306 | 0.00570 |
+| 6  | 0.00020 | **0.00710** | 0.00137 | 0.00123 |
+| 8  | 0.00022 | 0.00618 | 0.00105 | 0.00135 |
+| 12 | 0.02035 | 0.09472 | 0.02929 | 0.07859 |
+
+At L6 (raw 2.0e-4): **ln amplifies inter-sample std 35x (to 7.1e-3)**,
+norm_only 6.8x (1.4e-3), affine_only 6.1x (1.2e-3). So the mechanism is
+amplitude, not geometry: norm_only's per-sample normalisation leaves the
+cross-sample covariance structure untouched (participation ratio and top-1
+var frac identical to raw to 3 decimals - the within-sample std is nearly
+sample-invariant, so normalising by it is an almost uniform rescale), and its
+6.8x amplification is insufficient; affine_only's gamma is learned on the
+near-constant features, where its gradient is dominated by the constant
+component, so it cannot learn a large amplification (6.1x) even though the
+architecture allows it; ln combines the ~7x normalisation with a gamma/beta
+learned on the *normalised* (signal-visible) features, reaching 35x and
+selecting the signal dimensions. (Contrast task 04: centering amplifies
+inter-sample std by 1x - subtracting a constant does not change variance -
+yet rescues L6 to 0.317 by *removing* the constant component so the gradient
+is no longer dominated by it. Amplitude and constant-removal are two
+orthogonal fixes; ln applies both, which is why it is the best AdamW variant.)
+
 **Findings**:
 - `plain` collapses exactly on the low-inter-sample-std layers (4-8, 10): 0.03-0.17.
 - `ln` works on **every** layer (0.65-0.90), including the most collapsed (layer 6: 0.651, layer 8: 0.831).
 - `norm_only` (normalise, no affine) tracks `plain` - it fails wherever `plain` fails. Per-sample
-  normalisation does not remove the cross-sample constant, so it does not fix the conditioning.
+  normalisation amplifies inter-sample std only ~7x (not enough) and does not change the
+  cross-sample geometry or remove the cross-sample constant, so it does not fix the conditioning.
 - `affine_only` (gamma*x+beta, no normalise) is a reparameterised linear classifier; it rescues the
   *mildly* collapsed layers (1,2,3,9,10,11,12: 0.73-0.87) but still fails on the *severely* collapsed
-  ones (4,5,6,7,8: 0.12-0.64). Per-dim rescaling partially fixes conditioning but cannot amplify the
-  tiny signal at layers 4-8.
+  ones (4,5,6,7,8: 0.12-0.64). Per-dim rescaling partially fixes conditioning but the learned gamma
+  only amplifies ~6x (gradient dominated by the constant component on the raw features), which
+  cannot lift the tiny signal at layers 4-8.
 - With `ln`, mid layers 7 (0.901) and 10 (0.897) exceed the final layer 12 (0.870) - i.e. the
   H1' / H2 regime that EXP-001 wants to test only becomes visible once the probe can actually fit.
 
