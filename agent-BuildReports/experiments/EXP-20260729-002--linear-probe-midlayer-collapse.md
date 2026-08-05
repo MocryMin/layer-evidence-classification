@@ -153,6 +153,36 @@ orthogonal fixes; ln applies both, which is why it is the best AdamW variant.)
 The earlier layer-6-only ablation overstated affine_only's failure: affine_only fails on the *most*
 collapsed layer (6) but works on milder layers; full LN is the only AdamW variant that works on all.
 
+**Cross-fix comparison: LN vs affine_only vs centering** (all validation accuracy,
+identical training config: AdamW lr=1e-2, seed 17, 100 epochs, batch 256,
+wd=0.01; sources: `03a_ln_ablation/` and `04_mlp_probe/`):
+
+| layer | plain (baseline) | LN head | affine_only | centered plain |
+|------:|-----------------:|--------:|------------:|---------------:|
+| 1  | 0.135 | 0.806 | 0.728 | 0.594 |
+| 2  | 0.237 | 0.836 | 0.745 | 0.572 |
+| 3  | 0.437 | 0.876 | 0.848 | 0.740 |
+| 4  | 0.081 | 0.730 | 0.488 | 0.404 |
+| 5  | 0.124 | 0.776 | 0.586 | 0.469 |
+| 6  | 0.027 | **0.651** | 0.119 | 0.317 |
+| 7  | 0.064 | 0.901 | 0.642 | 0.732 |
+| 8  | 0.028 | 0.831 | 0.332 | 0.621 |
+| 9  | 0.583 | 0.844 | 0.838 | 0.783 |
+| 10 | 0.174 | 0.897 | 0.777 | 0.760 |
+| 11 | 0.801 | 0.867 | 0.870 | 0.878 |
+| 12 | 0.789 | 0.870 | 0.868 | 0.879 |
+| **mean** | 0.291 | **0.824** | 0.654 | 0.646 |
+
+On the collapsed layers (4-8) the ranking is LN (0.65-0.90) > centered plain
+(0.32-0.73) > affine_only (0.12-0.64) > plain (0.03-0.12); on the healthy
+layers (11-12) all three fixes converge to ~0.87-0.88. The two mechanisms are
+orthogonal (see transformed-stats table above): affine_only tries to learn the
+amplification but its gamma is constant-dominated and reaches only ~6x;
+centering removes the constant for free (amplitude 1x) which alone rescues
+L6 to 0.317; LN does both (35x amplification via normalisation + trained
+gamma/beta, plus constant absorption via beta) - the only AdamW variant that
+fits every layer.
+
 ### Task 3b - No-instruction prompt
 
 Re-cached with the pure-utterance prompt `{utterance}` (no `Classify the intent:`
