@@ -379,6 +379,34 @@ lr=1e-2, grad_clip=0, trained to convergence (relative train-loss change < 1e-4 
 10 epochs, max 20000 epochs). Data: `03h_adam_ablation/adam_ablation.json`. OLS
 reference: val 0.917 / test 0.907.
 
+**Optimiser ladder (task 3d + 03g).** Three optimisers on the plain probe
+(val acc, seed 17; `03d_optimizer/optimizer_comparison.json`): SGD (non-adaptive
+first-order) fails on *every* layer (L12 0.035, L6 0.007); AdamW (adaptive
+first-order) fails on mid layers but fits 9/12 (L12 0.789); LBFGS (quasi-Newton,
+second-order, full-batch) fits *every* layer (L6 0.410, L12 0.812). The ladder
+on L6, ordered by performance: SGD (0.007) < AdamW mini-batch 256 (0.027) <
+LBFGS 30ep (0.410) < LN head + AdamW (0.651, task 3a - an input transform, not
+an optimiser) < AdamW full-batch from Xavier, 20k epochs (0.698, below) <
+closed-form OLS (0.921, 03g) ≈ OLS-init + full-batch CE (0.919 @ep8, below).
+Each rung adds either curvature information (LBFGS), a conditioning fix (LN,
+centering), a better init (OLS), or removes noise (full-batch).
+
+**AdamW hyperparameters in this work.** Fixed by the protocol: lr=1e-2
+(selected by the smoke test), betas=(0.9, 0.999), eps=1e-8 (torch defaults),
+wd=0.01, grad-clip=1.0, batch=256, 100 epochs. The ablation varies wd, batch,
+init, epochs and the lr grid (task 1) varies lr - and the verdict per knob on
+the collapsed layers:
+- **lr: not the issue** - the unrestricted grid (1e-6..10) finds no lr that
+  fits L6 (best ~0.03; task 1);
+- **wd=0.01: harmful** - caps full-batch accuracy at ~0.55 and destroys an OLS
+  init (0.917 -> 0.023);
+- **batch: the decisive knob** - 256 fails for every init/wd; full-batch is the
+  single largest lever;
+- **init: matters hugely** - OLS init + full-batch CE peaks 0.919 @ep8; Xavier
+  from scratch crawls (0.70 at 20k, still climbing);
+- **epochs: not the cap for mini-batch** (it settles into the noise basin by
+  ~ep90) but the wrong knob entirely for full-batch from Xavier (needs ≫20k).
+
 | condition | init | batch | wd | init | best | @ep | final | test | n_ep |
 |---|---|---|---:|---:|---:|---:|---:|---:|---:|
 | A1  | ols | 256 | 0 | 0.917 | 0.773 | 50 | 0.611 | 0.619 | 171 |
