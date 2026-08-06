@@ -301,97 +301,67 @@ Identical. Mean |fp16 - fp32| = 2.9e-6, i.e. 1.4% of the signal magnitude (2.0e-
 the signal. The collapse is not a precision artefact; it is the conditioning/optimisation issue
 above. (Data: `03e_fp16_control/` - result logged here; recompute via the snippet in the report PR.)
 
-### Additional control - RidgeClassifier (paper comparison)
+### Task 03g - RidgeClassifier α grid (frozen base, instruction prompt)
 
-A prior paper used ProtectAI's `DeBERTa-v3-base-prompt-injection-v2` with a mid-layer **linear
-`RidgeClassifier(alpha=10)`** and did not encounter this collapse. Reproduced on our frozen-base
-cache, plain CLS, all 12 layers (val acc; `03f_ridge/ridge_results.json`):
+Closed-form L2 least-squares probe (`RidgeClassifier(alpha=α)`, solver=svd,
+fit_intercept=True, one-hot MSE) over an α grid [1e-6, 1e-5, 1e-4, 1e-3, 1e-2,
+1e-1, 1, 10, 100], on the frozen-base cache with the instruction prompt (the
+EXP-001 input regime; per task 03b the prompt does not change the collapse).
+This supersedes the earlier α=10-only control (03f): α=10 is one column of the
+grid. Data: `03g_ridge_alpha_grid/ridge_base_withprompt.json`. Validation
+accuracy by layer × α:
 
-| layer | Ridge(α=10) | plain AdamW | LBFGS | LN |
-|------:|------------:|------------:|------:|---:|
-| 6  | 0.075 | 0.027 | 0.410 | 0.651 |
-| 7  | 0.421 | 0.064 |  -    | 0.901 |
-| 8  | 0.389 | 0.028 |  -    | 0.831 |
-| 11 | 0.763 | 0.801 |  -    | 0.867 |
-| 12 | 0.778 | 0.789 | 0.812 | 0.870 |
+| layer | 1e-6 | 1e-5 | 1e-4 | 1e-3 | 1e-2 | 1e-1 | 1 | 10 | 100 |
+|------:|-----:|-----:|-----:|-----:|-----:|-----:|-----:|----:|----:|
+| 1  | 0.826 | 0.819 | 0.802 | 0.794 | 0.763 | 0.665 | 0.401 | 0.091 | 0.016 |
+| 2  | 0.872 | 0.861 | 0.847 | 0.812 | 0.723 | 0.532 | 0.268 | 0.076 | 0.035 |
+| 3  | 0.891 | 0.891 | 0.891 | 0.888 | 0.861 | 0.809 | 0.654 | 0.328 | 0.054 |
+| 4  | 0.885 | 0.874 | 0.838 | 0.751 | 0.598 | 0.339 | 0.092 | 0.045 | 0.040 |
+| 5  | 0.912 | 0.902 | 0.880 | 0.802 | 0.626 | 0.372 | 0.128 | 0.059 | 0.052 |
+| 6  | **0.917** | 0.905 | 0.864 | 0.742 | 0.454 | 0.189 | 0.086 | 0.075 | 0.073 |
+| 7  | 0.938 | 0.931 | 0.914 | 0.886 | 0.799 | 0.614 | 0.445 | 0.421 | 0.417 |
+| 8  | 0.940 | 0.933 | 0.923 | 0.874 | 0.727 | 0.485 | 0.401 | 0.389 | 0.389 |
+| 9  | 0.937 | 0.935 | 0.919 | 0.868 | 0.769 | 0.699 | 0.575 | 0.462 | 0.430 |
+| 10 | **0.942** | 0.937 | 0.928 | 0.906 | 0.848 | 0.689 | 0.514 | 0.454 | 0.443 |
+| 11 | 0.912 | 0.912 | 0.913 | **0.914** | 0.905 | 0.888 | 0.846 | 0.763 | 0.549 |
+| 12 | 0.903 | 0.903 | 0.903 | **0.904** | 0.900 | 0.881 | 0.851 | 0.778 | 0.589 |
 
-**Ridge(α=10) does NOT rescue the mid layers** (layer 6: 0.075, far below LBFGS 0.41 / LN 0.65),
-and underperforms plain AdamW on upper layers. `fit_intercept` (centering) makes no difference -
-the bottleneck is not the constant component. Layer-6 α sweep: 0.1 -> 0.189, 1 -> 0.086, 10 ->
-0.075, 100 -> 0.073, 1000 -> 0.071 (lower α helps but even α=0.1 stays poor).
+Readings:
+- **The best α is ~1e-6 (≈OLS) for every layer** (layers 11-12 peak at 1e-3,
+  within 0.002 of their 1e-6 value): closed-form least-squares at the correct
+  scale rescues the frozen-base mid layers (L6: 0.917 on the *same* cache where
+  plain AdamW got 0.027 and α=10 got 0.075). Test acc tracks val (L6: 0.907),
+  so this is not overfitting (n=15000 ≫ p=768×150).
+- **α-sensitivity is itself layer-dependent**: the collapsed layers (4-8)
+  degrade fastest as α grows (L6: 0.917 -> 0.073 over the grid, a 0.84 drop;
+  ~0.05-0.15 loss per order of magnitude above 1e-4), while the healthy layers
+  stay robust up to α=1 (L12: 0.903 -> 0.851; L11: 0.912 -> 0.846). The
+  over-regularisation disaster is specific to the tiny-variance layers.
+- **The OLS profile (α=1e-6) matches the H1'/H2 regime**: mid-upper layers
+  7-10 reach 0.938-0.942, L6 0.917, all *above* L12 (0.903) - once the probe
+  actually fits, intermediate layers are not inferior to the final layer.
 
-**Root cause - α is mis-scaled for the frozen-base features.** Layer-6 `X^T X` (centered)
-eigenvalues: top1 = 0.354, median = 4.2e-6, sum = 0.576. With α=10 the regulariser dominates the
-signal directions by 28x (top1) to 2.4e6x (median); the ridge shrinkage factor
-λ/(λ+α) retains only 3.4% of the top direction and ~0% of the rest - the signal is regularised
-away. LBFGS (cross-entropy) and LN (feature normalisation) do not apply this L2 shrinkage, so they
-recover the signal.
+**Root cause - α is mis-scaled for the frozen-base features.** Layer-6 `X^T X`
+(centered) eigenvalues: top1 = 0.354, median = 4.2e-6, sum = 0.576. With α=10
+the regulariser dominates the signal directions by 28x (top1) to 2.4e6x
+(median); the ridge shrinkage factor λ/(λ+α) retains only 3.4% of the top
+direction and ~0% of the rest - the signal is regularised away. At α=1e-6 the
+regulariser is below even the median eigenvalue, so the solve approaches OLS.
 
-**Why the paper did not hit this.** `DeBERTa-v3-base-prompt-injection-v2` is a *task-fine-tuned*
-model. Per task 3c, fine-tuning inflates the feature scale by ~40x (layer 12 inter-sample std
-0.020 -> 0.875), so `X^T X` eigenvalues become O(10^2-10^3) and α=10 is appropriately scaled. The
-collapse is specific to the *frozen base*; on a fine-tuned backbone Ridge(α=10) works fine. This
-also means: of the linear methods tested, only **cross-entropy optimisation (LBFGS) or feature
-normalisation (LN)** rescue the frozen-base mid layers - L2 least-squares at a fixed α does not.
+**Why the paper using α=10 did not hit this.** ProtectAI's
+`DeBERTa-v3-base-prompt-injection-v2` is *task-fine-tuned*. Per task 3c,
+fine-tuning inflates the feature scale ~40x (layer 12 inter-sample std 0.020 ->
+0.875), so `X^T X` eigenvalues become O(10^2-10^3) and α=10 is appropriately
+scaled; the collapse is specific to the *frozen base*, whose matching α is
+~1e-6. (Prompt is not the lever either: at α=1e-6 the instruction and
+pure-utterance caches agree within 0.005 per layer - task 03b's finding.)
 
-> **Update (task 03g, below):** this conclusion was an artefact of only sweeping α≥0.1.
-> Extending the α grid down to 1e-6 (≈OLS) rescues L6 to 0.917 - see "Task 03g". Observation 8
-> is revised accordingly.
-
-### Task 03g - RidgeClassifier α grid (revises 03f)
-
-The 03f control only tried α=10 (plus a 5-point L6 sweep down to α=0.1) and concluded
-"fixed-α L2 least-squares does not rescue". This swept α over [1e-6, 1e-5, 1e-4, 1e-3,
-1e-2, 1e-1, 1, 10, 100] (`solver=svd`, `fit_intercept=True`) on three caches: frozen base
-+ no-instruction prompt (03b), FT backbone + no-instruction prompt (newly cached), and -
-to disentangle α from prompt - frozen base + instruction prompt (EXP-001 cache). Data:
-`03g_ridge_alpha_grid/`.
-
-**Ridge at α=1e-6 (≈OLS) rescues the frozen-base mid layers.** Layer-6 val acc vs α:
-
-| α | base+instr | base+pure | ft+pure |
-|---:|---:|---:|---:|
-| 1e-6 | **0.917** | **0.912** | 0.944 |
-| 1e-4 | 0.864 | 0.873 | 0.933 |
-| 1e-2 | 0.454 | 0.621 | 0.843 |
-| 1e-1 | 0.189 | 0.354 | 0.676 |
-| 10   | 0.075 | 0.176 | 0.499 |
-| 100  | 0.073 | 0.173 | 0.496 |
-
-Performance rises monotonically as α shrinks; best α is 1e-6 (or 1e-5) for every frozen-base
-mid layer. At α=1e-6, layer 6 reaches 0.917 - on the *same* with-instruction cache where
-α=10 gave 0.075 and plain AdamW gave 0.027. Test acc tracks val (0.907 at L6), so this is
-not overfitting (n=15000 ≫ p=768×150).
-
-**Prompt is not the lever; α is.** At α=1e-6 the with-instruction and pure-utterance caches
-agree within 0.005 at every layer (L6: 0.917 vs 0.912). The variance collapse is intrinsic
-to the frozen backbone (03b: L6 inter-std 0.00028, essentially identical to the
-with-instruction 0.00020) and prompt-independent; removing the instruction does not fix it
-(observation 5 stands). What 03f missed was simply that α=10 is ~5 orders of magnitude too
-large for the frozen-base feature scale.
-
-**Cross-cache at α=1e-6 (val acc):**
-
-| layer | base+instr | base+pure | ft+pure |
-|---:|---:|---:|---:|
-| 1  | 0.826 | 0.792 | 0.788 |
-| 4  | 0.885 | 0.849 | 0.870 |
-| 6  | 0.917 | 0.912 | 0.944 |
-| 8  | 0.940 | 0.936 | 0.965 |
-| 10 | 0.942 | 0.926 | 0.968 |
-| 12 | 0.903 | 0.886 | 0.967 |
-
-FT is uniformly best and α-robust (L12 stays 0.967 even at α=10, because FT inflates the
-feature scale so X^T X eigenvalues dominate any α in this range). On the frozen base the
-mid-upper layers (7-10, ≈0.94) slightly exceed L12 (≈0.90).
-
-**This revises observation 8.** Closed-form least-squares (Ridge α≈1e-6, i.e. OLS) *does*
-rescue the frozen-base mid layers - and more decisively than any CE probe tried so far
-(L6: OLS 0.917 vs 30-epoch LBFGS 0.41 vs LN+AdamW 0.65 vs plain AdamW 0.027). What fails is
-(i) first-order CE optimisation (AdamW/SGD) on the ill-conditioned landscape and
-(ii) *over-regularised* Ridge (α=10). A correctly-scaled closed-form L2 solve recovers the
-signal. The paper's α=10 worked because its backbone was task-fine-tuned (well-scaled
-features); on the frozen base the matching α is ~1e-6.
+**This revises observation 8.** Closed-form least-squares (Ridge α≈1e-6, i.e.
+OLS) *does* rescue the frozen-base mid layers - more decisively than any CE
+probe tried so far (L6: OLS 0.917 vs 30-epoch LBFGS 0.41 vs LN+AdamW 0.65 vs
+plain AdamW 0.027). What fails is (i) first-order CE optimisation (AdamW/SGD)
+on the ill-conditioned landscape and (ii) *over-regularised* Ridge (α=10). A
+correctly-scaled closed-form L2 solve recovers the signal.
 
 ### Task 03h - Is AdamW's collapse fundamental? (init × batch × wd ablation)
 
