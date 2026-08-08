@@ -526,10 +526,12 @@ locked.
 ### Task 05 - Activation ablation: the uniform attractor is not ReLU-specific
 
 Is the dead-lock specific to ReLU? Same structure ``z = W2 * act(W1 x + b1) + b2``
-(both biases, 919r+150 params) with act in {none, relu, leaky, gelu}, identical
-training (lr=1e-2, seed 17, 100ep, batch 256, wd=0.01, grad_clip=1.0). The
-``relu`` row here carries b2 for structure parity (task 04's ReLU MLP had it
-bias-free; +150 params, 0.13% - behaviour identical). Data:
+(both biases, 919r+150 params) with act in {none, relu, leaky, gelu, sigmoid},
+identical training (lr=1e-2, seed 17, 100ep, batch 256, wd=0.01, grad_clip=1.0).
+The ``relu`` row here carries b2 for structure parity (task 04's ReLU MLP had it
+bias-free; +150 params, 0.13% - behaviour identical). ``sigmoid`` is the
+bounded-saturating control (output always in (0,1), gradient -> 0 at both
+ends) - the last major activation family not yet covered. Data:
 `05_act_ablation/act_ablation.json`. Best val acc (r=128) and final train loss
 range across layers:
 
@@ -539,6 +541,7 @@ range across layers:
 | relu | 0.007 | 0.007 | 0.007 | 0.007 | 0.007 | 5.012 = ln(150) (uniform) |
 | leaky | 0.015 | 0.018 | 0.007 | 0.007 | 0.022 | 4.92 - 5.81 (near-uniform) |
 | gelu | 0.007 | 0.013 | 0.007 | 0.007 | 0.007 | 5.011 - 5.019 (uniform) |
+| sigmoid | 0.014 | 0.019 | 0.007 | 0.007 | 0.007 | 4.86 - 5.54 (8/12 uniform) |
 
 **Every activation fails on the raw features**, and the capacity check (L6 x
 r in {64,128,256}) is uniformly 0.007-0.010. The failure modes differ:
@@ -551,6 +554,14 @@ r in {64,128,256}) is uniformly 0.007-0.010. The failure modes differ:
   at the "dead" point, so the loss stalls at 5.00-5.13 (within 0.8 of
   uniform) instead of locking exactly; val acc stays 0.007-0.022. The 0.01
   slope is too weak to escape within 100 epochs.
+- **sigmoid**: pre-activations are pushed to <= 0 (neg-fraction 1.00 on 8/12
+  layers), so the near-constant pre-activations land in the low-gradient
+  half-interval and the network dead-locks at logits=b2, loss exactly
+  ln(150) - same signature as relu/gelu. On L1-L3 / L11-L12 it only partially
+  dead-locks (neg-fraction 0.62-0.96): the saturating slope keeps a weak
+  gradient, the loss stalls near uniform (4.86-5.54; L2-L3 even dip slightly
+  *below* ln(150) - the first nonlinear act to do so) - yet val acc stays
+  0.007-0.019 (chance). The bounded-saturating family fails identically.
 - **none (pure 2-layer linear)**: cannot dead-lock (neg-fraction ~0.5), yet
   still fails everywhere - the train loss *diverges* (7.9-47.6, logits grow
   unbounded) and val acc stays 0.010-0.084. A different failure mode
@@ -560,7 +571,10 @@ r in {64,128,256}) is uniformly 0.007-0.010. The failure modes differ:
 
 So the uniform-prediction attractor is **not a ReLU artifact**: it is the
 consequence of the near-constant CLS (shared logits -> aligned gradient), and
-only the 1-layer head escapes via its bias. Removing the constant component
+only the 1-layer head escapes via its bias. With sigmoid added, all four
+activation families (piecewise-dead / leaky / smooth-unbounded /
+bounded-saturating) fail in the same way - the coverage is now exhaustive for
+the standard single-hidden-layer families. Removing the constant component
 (centering, task 04) or using a closed-form solve (OLS, task 03g) remains the
 only working remedies.
 
@@ -689,15 +703,18 @@ entirely - left as a follow-up.
     capacity only pays off after a (linear) centring fix.
 
 12. **The uniform attractor is not ReLU-specific (task 05).** The activation
-    ablation (none / relu / leaky / gelu, same 2-layer structure and training)
-    fails on the raw features for *every* activation, at every r on L6: relu and
-    gelu dead-lock at uniform (loss = ln(150), neg-fraction 1.00 - GELU's
-    gradient also vanishes as x -> -inf); leaky stalls within 0.8 of uniform
-    (the 0.01 slope is too weak to escape); the pure 2-layer linear cannot
-    dead-lock (neg ~0.5) but *diverges* (train loss 7.9-47.6) and still fails
-    even at L12 (0.073 vs plain 0.789). The attractor is a property of the
-    near-constant features (shared logits -> aligned gradient), not of ReLU;
-    only the 1-layer bias-carrying head escapes it.
+    ablation (none / relu / leaky / gelu / sigmoid, same 2-layer structure and
+    training) fails on the raw features for *every* activation, at every r on
+    L6: relu and gelu dead-lock at uniform (loss = ln(150), neg-fraction 1.00 -
+    GELU's gradient also vanishes as x -> -inf); leaky stalls within 0.8 of
+    uniform (the 0.01 slope is too weak to escape); sigmoid (bounded-saturating,
+    gradient -> 0 at both ends) dead-locks at uniform on 8/12 layers and stalls
+    just below it on the rest (4.86-5.54) - val acc stays at chance everywhere;
+    the pure 2-layer linear cannot dead-lock (neg ~0.5) but *diverges* (train
+    loss 7.9-47.6) and still fails even at L12 (0.073 vs plain 0.789). The
+    attractor is a property of the near-constant features (shared logits ->
+    aligned gradient), not of ReLU; only the 1-layer bias-carrying head escapes
+    it.
 
 13. **The compression is CLS-specific, not a general mid-layer property
     (task 06).** A per-token-position check (2000-sample subset, identical

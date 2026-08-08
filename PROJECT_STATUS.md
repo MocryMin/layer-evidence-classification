@@ -53,13 +53,15 @@ EXP-002 diagnostics (seed 17, frozen backbone unless noted), validation accuracy
   negative features. Centering the features (fixed linear transform) rescues:
   centered plain L6 0.317, centered MLP r=256 L6 0.737 / L7 0.913 > L12 - but
   OLS (0.917 L6) still wins. Collapse is NOT a linearity limitation.
-- **Activation ablation (task 05):** none/relu/leaky/gelu all fail on raw
-  features (L6 best 0.007-0.010, all r). relu/gelu dead-lock at uniform
+- **Activation ablation (task 05):** none/relu/leaky/gelu/sigmoid all fail on
+  raw features (L6 best 0.007-0.010, all r). relu/gelu dead-lock at uniform
   (loss=ln(150), neg=1.00); leaky stalls 0.8 within uniform (slope too weak);
-  2-layer linear (no act) cannot dead-lock but diverges (loss 7.9-47.6) and
-  fails even at L12. The uniform attractor is NOT ReLU-specific - it is a
-  property of the near-constant features; only the 1-layer bias-carrying head
-  escapes it.
+  sigmoid (bounded-saturating) dead-locks at uniform on 8/12 layers, stalls
+  4.86-5.54 on the rest (still chance acc) - all four activation families
+  covered; 2-layer linear (no act) cannot dead-lock but diverges (loss
+  7.9-47.6) and fails even at L12. The uniform attractor is NOT ReLU-specific
+  - it is a property of the near-constant features; only the 1-layer
+  bias-carrying head escapes it.
 - **Token-position check (task 06): the compression is CLS-specific.** On a
   2000-sample subset (CLS values reproduce full-set stats), non-CLS tokens
   have healthy inter-sample std at every layer - at L6 (CLS 2e-4) all non-CLS
