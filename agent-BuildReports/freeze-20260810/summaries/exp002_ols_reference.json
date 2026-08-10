@@ -1,0 +1,53 @@
+{
+  "description": "Strict OLS (RidgeClassifier alpha=0, solver=svd, fit_intercept=True) on the frozen-base instruction-prompt cache; contrast with the alpha grid.",
+  "per_layer": {
+    "1": {
+      "ols_val": 0.8266666666666667,
+      "ols_test": 0.8286666666666667
+    },
+    "2": {
+      "ols_val": 0.8743333333333333,
+      "ols_test": 0.8644444444444445
+    },
+    "3": {
+      "ols_val": 0.8906666666666667,
+      "ols_test": 0.8926666666666667
+    },
+    "4": {
+      "ols_val": 0.8886666666666667,
+      "ols_test": 0.8708888888888889
+    },
+    "5": {
+      "ols_val": 0.917,
+      "ols_test": 0.9091111111111111
+    },
+    "6": {
+      "ols_val": 0.921,
+      "ols_test": 0.9144444444444444
+    },
+    "7": {
+      "ols_val": 0.9393333333333334,
+      "ols_test": 0.9275555555555556
+    },
+    "8": {
+      "ols_val": 0.9443333333333334,
+      "ols_test": 0.9277777777777778
+    },
+    "9": {
+      "ols_val": 0.9366666666666666,
+      "ols_test": 0.9246666666666666
+    },
+    "10": {
+      "ols_val": 0.9446666666666667,
+      "ols_test": 0.926
+    },
+    "11": {
+      "ols_val": 0.912,
+      "ols_test": 0.9051111111111111
+    },
+    "12": {
+      "ols_val": 0.903,
+      "ols_test": 0.8851111111111111
+    }
+  }
+}

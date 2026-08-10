@@ -1,0 +1,90 @@
+{
+  "test": "RidgeClassifier on plain CLS (EXP-001 cache)",
+  "alpha": 10.0,
+  "per_layer": {
+    "1": {
+      "ridge_val": 0.091,
+      "ridge_test": 0.10311111111111111,
+      "ridge_no_intercept_val": 0.09066666666666667,
+      "plain_adamw": 0.13466666638851166,
+      "lbfgs": 0.7893333435058594
+    },
+    "2": {
+      "ridge_val": 0.07633333333333334,
+      "ridge_test": 0.08866666666666667,
+      "ridge_no_intercept_val": 0.07566666666666666,
+      "plain_adamw": 0.23733332753181458,
+      "lbfgs": null
+    },
+    "3": {
+      "ridge_val": 0.328,
+      "ridge_test": 0.3257777777777778,
+      "ridge_no_intercept_val": 0.329,
+      "plain_adamw": 0.43700000643730164,
+      "lbfgs": 0.8623332977294922
+    },
+    "4": {
+      "ridge_val": 0.045,
+      "ridge_test": 0.04577777777777778,
+      "ridge_no_intercept_val": 0.045,
+      "plain_adamw": 0.08133333176374435,
+      "lbfgs": null
+    },
+    "5": {
+      "ridge_val": 0.058666666666666666,
+      "ridge_test": 0.06555555555555556,
+      "ridge_no_intercept_val": 0.058666666666666666,
+      "plain_adamw": 0.12433332949876785,
+      "lbfgs": null
+    },
+    "6": {
+      "ridge_val": 0.07466666666666667,
+      "ridge_test": 0.08422222222222223,
+      "ridge_no_intercept_val": 0.07466666666666667,
+      "plain_adamw": 0.02733333222568035,
+      "lbfgs": 0.40966665744781494
+    },
+    "7": {
+      "ridge_val": 0.42133333333333334,
+      "ridge_test": 0.43422222222222223,
+      "ridge_no_intercept_val": 0.42133333333333334,
+      "plain_adamw": 0.06366666406393051,
+      "lbfgs": null
+    },
+    "8": {
+      "ridge_val": 0.389,
+      "ridge_test": 0.3857777777777778,
+      "ridge_no_intercept_val": 0.3903333333333333,
+      "plain_adamw": 0.028333332389593124,
+      "lbfgs": null
+    },
+    "9": {
+      "ridge_val": 0.46166666666666667,
+      "ridge_test": 0.44755555555555554,
+      "ridge_no_intercept_val": 0.46166666666666667,
+      "plain_adamw": 0.5830000042915344,
+      "lbfgs": 0.831333339214325
+    },
+    "10": {
+      "ridge_val": 0.45366666666666666,
+      "ridge_test": 0.44555555555555554,
+      "ridge_no_intercept_val": 0.45366666666666666,
+      "plain_adamw": 0.1743333339691162,
+      "lbfgs": null
+    },
+    "11": {
+      "ridge_val": 0.7626666666666667,
+      "ridge_test": 0.7444444444444445,
+      "ridge_no_intercept_val": 0.7636666666666667,
+      "plain_adamw": 0.8006666302680969,
+      "lbfgs": null
+    },
+    "12": {
+      "ridge_val": 0.7783333333333333,
+      "ridge_test": 0.7586666666666667,
+      "ridge_no_intercept_val": 0.7783333333333333,
+      "plain_adamw": 0.7889999747276306,
+      "lbfgs": 0.8116666674613953
+    }
+  }
+}

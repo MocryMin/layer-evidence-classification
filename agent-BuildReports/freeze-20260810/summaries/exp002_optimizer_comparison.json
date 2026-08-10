@@ -1,0 +1,233 @@
+{
+  "adamw": {
+    "layer_1_lr_0.01": {
+      "layer": 1,
+      "lr": 0.01,
+      "best_val_acc": 0.13466666638851166,
+      "best_val_nll": 4.38751745223999,
+      "best_epoch": 96,
+      "final_val_acc": 0.12333333492279053,
+      "final_val_nll": 4.374137878417969
+    },
+    "layer_1_lr_0.1": {
+      "layer": 1,
+      "lr": 0.1,
+      "best_val_acc": 0.13099999725818634,
+      "best_val_nll": 4.739469528198242,
+      "best_epoch": 37,
+      "final_val_acc": 0.08699999749660492,
+      "final_val_nll": 4.6691508293151855
+    },
+    "layer_3_lr_0.01": {
+      "layer": 3,
+      "lr": 0.01,
+      "best_val_acc": 0.43700000643730164,
+      "best_val_nll": 3.451160430908203,
+      "best_epoch": 100,
+      "final_val_acc": 0.43700000643730164,
+      "final_val_nll": 3.451160430908203
+    },
+    "layer_3_lr_0.1": {
+      "layer": 3,
+      "lr": 0.1,
+      "best_val_acc": 0.38366666436195374,
+      "best_val_nll": 3.25008487701416,
+      "best_epoch": 77,
+      "final_val_acc": 0.343666672706604,
+      "final_val_nll": 3.3037376403808594
+    },
+    "layer_6_lr_0.01": {
+      "layer": 6,
+      "lr": 0.01,
+      "best_val_acc": 0.02733333222568035,
+      "best_val_nll": 4.984875679016113,
+      "best_epoch": 76,
+      "final_val_acc": 0.012666666880249977,
+      "final_val_nll": 4.975051403045654
+    },
+    "layer_6_lr_0.1": {
+      "layer": 6,
+      "lr": 0.1,
+      "best_val_acc": 0.02133333310484886,
+      "best_val_nll": 5.188505172729492,
+      "best_epoch": 50,
+      "final_val_acc": 0.01666666567325592,
+      "final_val_nll": 5.151522159576416
+    },
+    "layer_9_lr_0.01": {
+      "layer": 9,
+      "lr": 0.01,
+      "best_val_acc": 0.5830000042915344,
+      "best_val_nll": 3.257030487060547,
+      "best_epoch": 95,
+      "final_val_acc": 0.5630000233650208,
+      "final_val_nll": 3.2162857055664062
+    },
+    "layer_9_lr_0.1": {
+      "layer": 9,
+      "lr": 0.1,
+      "best_val_acc": 0.5370000004768372,
+      "best_val_nll": 2.76171612739563,
+      "best_epoch": 71,
+      "final_val_acc": 0.48366665840148926,
+      "final_val_nll": 2.800177812576294
+    },
+    "layer_12_lr_0.01": {
+      "layer": 12,
+      "lr": 0.01,
+      "best_val_acc": 0.7889999747276306,
+      "best_val_nll": 0.9938690066337585,
+      "best_epoch": 100,
+      "final_val_acc": 0.7889999747276306,
+      "final_val_nll": 0.9938690066337585
+    },
+    "layer_12_lr_0.1": {
+      "layer": 12,
+      "lr": 0.1,
+      "best_val_acc": 0.5573333501815796,
+      "best_val_nll": 5.1955389976501465,
+      "best_epoch": 80,
+      "final_val_acc": 0.5226666331291199,
+      "final_val_nll": 4.074468612670898
+    }
+  },
+  "sgd": {
+    "layer_1_lr_0.01": {
+      "layer": 1,
+      "lr": 0.01,
+      "best_val_acc": 0.017666665837168694,
+      "best_val_nll": 5.00407075881958,
+      "best_epoch": 88,
+      "final_val_acc": 0.0139999995008111,
+      "final_val_nll": 5.004023551940918
+    },
+    "layer_1_lr_0.1": {
+      "layer": 1,
+      "lr": 0.1,
+      "best_val_acc": 0.012000000104308128,
+      "best_val_nll": 5.041127681732178,
+      "best_epoch": 6,
+      "final_val_acc": 0.006666666828095913,
+      "final_val_nll": 5.040140628814697
+    },
+    "layer_3_lr_0.01": {
+      "layer": 3,
+      "lr": 0.01,
+      "best_val_acc": 0.022333333268761635,
+      "best_val_nll": 5.004218101501465,
+      "best_epoch": 87,
+      "final_val_acc": 0.0139999995008111,
+      "final_val_nll": 5.0042009353637695
+    },
+    "layer_3_lr_0.1": {
+      "layer": 3,
+      "lr": 0.1,
+      "best_val_acc": 0.013666666112840176,
+      "best_val_nll": 5.007267951965332,
+      "best_epoch": 48,
+      "final_val_acc": 0.00833333283662796,
+      "final_val_nll": 5.007788181304932
+    },
+    "layer_6_lr_0.01": {
+      "layer": 6,
+      "lr": 0.01,
+      "best_val_acc": 0.00699999975040555,
+      "best_val_nll": 5.010735511779785,
+      "best_epoch": 7,
+      "final_val_acc": 0.006666666828095913,
+      "final_val_nll": 5.010714054107666
+    },
+    "layer_6_lr_0.1": {
+      "layer": 6,
+      "lr": 0.1,
+      "best_val_acc": 0.006666666828095913,
+      "best_val_nll": 5.020152568817139,
+      "best_epoch": 50,
+      "final_val_acc": 0.006666666828095913,
+      "final_val_nll": 5.023077487945557
+    },
+    "layer_9_lr_0.01": {
+      "layer": 9,
+      "lr": 0.01,
+      "best_val_acc": 0.013333333656191826,
+      "best_val_nll": 5.010403156280518,
+      "best_epoch": 99,
+      "final_val_acc": 0.006666666828095913,
+      "final_val_nll": 5.010409355163574
+    },
+    "layer_9_lr_0.1": {
+      "layer": 9,
+      "lr": 0.1,
+      "best_val_acc": 0.009333333000540733,
+      "best_val_nll": 5.016570091247559,
+      "best_epoch": 55,
+      "final_val_acc": 0.006666666828095913,
+      "final_val_nll": 5.016593933105469
+    },
+    "layer_12_lr_0.01": {
+      "layer": 12,
+      "lr": 0.01,
+      "best_val_acc": 0.03533333167433739,
+      "best_val_nll": 4.965445518493652,
+      "best_epoch": 63,
+      "final_val_acc": 0.01899999938905239,
+      "final_val_nll": 4.96044397354126
+    },
+    "layer_12_lr_0.1": {
+      "layer": 12,
+      "lr": 0.1,
+      "best_val_acc": 0.02133333310484886,
+      "best_val_nll": 5.205606937408447,
+      "best_epoch": 22,
+      "final_val_acc": 0.009999999776482582,
+      "final_val_nll": 5.217301368713379
+    }
+  },
+  "lbfgs": {
+    "layer_1_lr_1": {
+      "layer": 1,
+      "lr": 1.0,
+      "best_val_acc": 0.7893333435058594,
+      "best_val_nll": 0.9153903126716614,
+      "best_epoch": 30,
+      "final_val_acc": 0.7893333435058594,
+      "final_val_nll": 0.9153903126716614
+    },
+    "layer_3_lr_1": {
+      "layer": 3,
+      "lr": 1.0,
+      "best_val_acc": 0.8623332977294922,
+      "best_val_nll": 1.4078410863876343,
+      "best_epoch": 25,
+      "final_val_acc": 0.8610000014305115,
+      "final_val_nll": 1.4498416185379028
+    },
+    "layer_6_lr_1": {
+      "layer": 6,
+      "lr": 1.0,
+      "best_val_acc": 0.40966665744781494,
+      "best_val_nll": 3.5563275814056396,
+      "best_epoch": 2,
+      "final_val_acc": 0.40966665744781494,
+      "final_val_nll": 3.5563275814056396
+    },
+    "layer_9_lr_1": {
+      "layer": 9,
+      "lr": 1.0,
+      "best_val_acc": 0.831333339214325,
+      "best_val_nll": 0.8923867344856262,
+      "best_epoch": 2,
+      "final_val_acc": 0.8053333163261414,
+      "final_val_nll": 947.2828369140625
+    },
+    "layer_12_lr_1": {
+      "layer": 12,
+      "lr": 1.0,
+      "best_val_acc": 0.8116666674613953,
+      "best_val_nll": 1.8975518941879272,
+      "best_epoch": 5,
+      "final_val_acc": 0.7963333129882812,
+      "final_val_nll": 45.51531219482422
+    }
+  }
+}

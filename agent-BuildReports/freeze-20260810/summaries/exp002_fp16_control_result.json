@@ -1,0 +1,26 @@
+{
+  "test": "fp16 precision control on layer 6",
+  "config": {
+    "head": "plain",
+    "optimizer": "adamw",
+    "lr": 0.01,
+    "epochs": 100,
+    "seed": 17
+  },
+  "results": {
+    "fp16_cached": {
+      "best_val_acc": 0.0273,
+      "final_val_acc": 0.0127
+    },
+    "fp32_fresh": {
+      "best_val_acc": 0.0273,
+      "final_val_acc": 0.0127
+    }
+  },
+  "precision": {
+    "signal_std": 0.000203,
+    "mean_abs_diff_fp16_vs_fp32": 2.88e-06,
+    "diff_over_signal": 0.014
+  },
+  "conclusion": "fp16 is not the cause; collapse is conditioning/optimisation."
+}

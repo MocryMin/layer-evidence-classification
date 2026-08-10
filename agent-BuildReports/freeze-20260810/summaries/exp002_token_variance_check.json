@@ -1,0 +1,349 @@
+{
+  "description": "Per-token-position inter-sample std (variance compression check). Same config as EXP-001 cache (frozen base, instruction prompt, left trunc, max_length 512) on a 2000-sample train subset; padding excluded (mask).",
+  "config": {
+    "n_sample": 2000,
+    "min_eff": 300,
+    "layers": [
+      1,
+      6,
+      12
+    ],
+    "seed": 17,
+    "prompt": "Classify the intent: {utterance}",
+    "max_length": 512,
+    "truncation": "left",
+    "model": "/home/mocry/projects/layer-evidence-classification/models/deberta-v3-base"
+  },
+  "layers": {
+    "1": [
+      {
+        "pos": 0,
+        "n_eff": 2000,
+        "inter_sample_std": 0.0035036573278331242,
+        "mean_norm": 6.621636329855957
+      },
+      {
+        "pos": 1,
+        "n_eff": 2000,
+        "inter_sample_std": 0.05281032612287486,
+        "mean_norm": 18.977979538065586
+      },
+      {
+        "pos": 2,
+        "n_eff": 2000,
+        "inter_sample_std": 0.023339461459048666,
+        "mean_norm": 18.95843211145548
+      },
+      {
+        "pos": 3,
+        "n_eff": 2000,
+        "inter_sample_std": 0.019702224878836567,
+        "mean_norm": 9.360937648583102
+      },
+      {
+        "pos": 4,
+        "n_eff": 2000,
+        "inter_sample_std": 0.08643492847292089,
+        "mean_norm": 19.0228120828091
+      },
+      {
+        "pos": 5,
+        "n_eff": 2000,
+        "inter_sample_std": 0.06399783026541628,
+        "mean_norm": 9.9809806110134
+      },
+      {
+        "pos": 6,
+        "n_eff": 2000,
+        "inter_sample_std": 0.5314359695490324,
+        "mean_norm": 16.765589620718345
+      },
+      {
+        "pos": 7,
+        "n_eff": 2000,
+        "inter_sample_std": 0.546009620639653,
+        "mean_norm": 16.345845825522296
+      },
+      {
+        "pos": 8,
+        "n_eff": 2000,
+        "inter_sample_std": 0.5459342158570201,
+        "mean_norm": 15.901123675079617
+      },
+      {
+        "pos": 9,
+        "n_eff": 1993,
+        "inter_sample_std": 0.5656989196544155,
+        "mean_norm": 16.294550364599527
+      },
+      {
+        "pos": 10,
+        "n_eff": 1962,
+        "inter_sample_std": 0.5577258336246906,
+        "mean_norm": 15.920909217094934
+      },
+      {
+        "pos": 11,
+        "n_eff": 1868,
+        "inter_sample_std": 0.5456785670306249,
+        "mean_norm": 15.438130252856345
+      },
+      {
+        "pos": 12,
+        "n_eff": 1677,
+        "inter_sample_std": 0.5324162731963714,
+        "mean_norm": 14.876521837711582
+      },
+      {
+        "pos": 13,
+        "n_eff": 1389,
+        "inter_sample_std": 0.520356921948331,
+        "mean_norm": 14.400347003131346
+      },
+      {
+        "pos": 14,
+        "n_eff": 1059,
+        "inter_sample_std": 0.5129112893171015,
+        "mean_norm": 14.146825943531434
+      },
+      {
+        "pos": 15,
+        "n_eff": 788,
+        "inter_sample_std": 0.5112126620013987,
+        "mean_norm": 14.095369783136919
+      },
+      {
+        "pos": 16,
+        "n_eff": 571,
+        "inter_sample_std": 0.5113997847369834,
+        "mean_norm": 14.118256308133462
+      },
+      {
+        "pos": 17,
+        "n_eff": 415,
+        "inter_sample_std": 0.4994169578515846,
+        "mean_norm": 13.744982445958401
+      }
+    ],
+    "6": [
+      {
+        "pos": 0,
+        "n_eff": 2000,
+        "inter_sample_std": 0.00018175115394513983,
+        "mean_norm": 4.114502417177989
+      },
+      {
+        "pos": 1,
+        "n_eff": 2000,
+        "inter_sample_std": 0.10780914444865623,
+        "mean_norm": 14.992277045983327
+      },
+      {
+        "pos": 2,
+        "n_eff": 2000,
+        "inter_sample_std": 0.11948847413935572,
+        "mean_norm": 13.934711166036637
+      },
+      {
+        "pos": 3,
+        "n_eff": 2000,
+        "inter_sample_std": 0.10672099480769925,
+        "mean_norm": 12.80608022287597
+      },
+      {
+        "pos": 4,
+        "n_eff": 2000,
+        "inter_sample_std": 0.13297283081494293,
+        "mean_norm": 14.077019530048304
+      },
+      {
+        "pos": 5,
+        "n_eff": 2000,
+        "inter_sample_std": 0.1462462447494486,
+        "mean_norm": 12.492865206239681
+      },
+      {
+        "pos": 6,
+        "n_eff": 2000,
+        "inter_sample_std": 0.4021056283177386,
+        "mean_norm": 14.135551376107937
+      },
+      {
+        "pos": 7,
+        "n_eff": 2000,
+        "inter_sample_std": 0.41524444431505897,
+        "mean_norm": 13.778850993011215
+      },
+      {
+        "pos": 8,
+        "n_eff": 2000,
+        "inter_sample_std": 0.42339483786878973,
+        "mean_norm": 13.873856001088336
+      },
+      {
+        "pos": 9,
+        "n_eff": 1993,
+        "inter_sample_std": 0.4307394349781087,
+        "mean_norm": 13.82475765361084
+      },
+      {
+        "pos": 10,
+        "n_eff": 1962,
+        "inter_sample_std": 0.425257686551005,
+        "mean_norm": 13.492974699396632
+      },
+      {
+        "pos": 11,
+        "n_eff": 1868,
+        "inter_sample_std": 0.4138548153577255,
+        "mean_norm": 12.942457894488044
+      },
+      {
+        "pos": 12,
+        "n_eff": 1677,
+        "inter_sample_std": 0.40135382809162296,
+        "mean_norm": 12.293155068237876
+      },
+      {
+        "pos": 13,
+        "n_eff": 1389,
+        "inter_sample_std": 0.38965544943400426,
+        "mean_norm": 11.694177244639377
+      },
+      {
+        "pos": 14,
+        "n_eff": 1059,
+        "inter_sample_std": 0.384268325587976,
+        "mean_norm": 11.496440543407724
+      },
+      {
+        "pos": 15,
+        "n_eff": 788,
+        "inter_sample_std": 0.38213309752875185,
+        "mean_norm": 11.345462791458862
+      },
+      {
+        "pos": 16,
+        "n_eff": 571,
+        "inter_sample_std": 0.3858272365674311,
+        "mean_norm": 11.404793542748052
+      },
+      {
+        "pos": 17,
+        "n_eff": 415,
+        "inter_sample_std": 0.37921102395840506,
+        "mean_norm": 11.07243240238656
+      }
+    ],
+    "12": [
+      {
+        "pos": 0,
+        "n_eff": 2000,
+        "inter_sample_std": 0.020237568492637963,
+        "mean_norm": 19.289916162179534
+      },
+      {
+        "pos": 1,
+        "n_eff": 2000,
+        "inter_sample_std": 0.27675949879080636,
+        "mean_norm": 48.013427966802844
+      },
+      {
+        "pos": 2,
+        "n_eff": 2000,
+        "inter_sample_std": 0.25296671972829826,
+        "mean_norm": 47.03272021202632
+      },
+      {
+        "pos": 3,
+        "n_eff": 2000,
+        "inter_sample_std": 0.2842440034330001,
+        "mean_norm": 45.01427698156576
+      },
+      {
+        "pos": 4,
+        "n_eff": 2000,
+        "inter_sample_std": 0.2828970541916067,
+        "mean_norm": 51.292920365928104
+      },
+      {
+        "pos": 5,
+        "n_eff": 2000,
+        "inter_sample_std": 0.32381174213891906,
+        "mean_norm": 39.055856486910606
+      },
+      {
+        "pos": 6,
+        "n_eff": 2000,
+        "inter_sample_std": 0.49236733917821013,
+        "mean_norm": 41.19227648119661
+      },
+      {
+        "pos": 7,
+        "n_eff": 2000,
+        "inter_sample_std": 0.6214380712712799,
+        "mean_norm": 39.81647928759929
+      },
+      {
+        "pos": 8,
+        "n_eff": 2000,
+        "inter_sample_std": 0.6332600645327302,
+        "mean_norm": 41.31745848845255
+      },
+      {
+        "pos": 9,
+        "n_eff": 1993,
+        "inter_sample_std": 0.6192861347704025,
+        "mean_norm": 42.07791529386055
+      },
+      {
+        "pos": 10,
+        "n_eff": 1962,
+        "inter_sample_std": 0.6165827438356088,
+        "mean_norm": 41.645055163964344
+      },
+      {
+        "pos": 11,
+        "n_eff": 1868,
+        "inter_sample_std": 0.6131996983679627,
+        "mean_norm": 40.48495087309943
+      },
+      {
+        "pos": 12,
+        "n_eff": 1677,
+        "inter_sample_std": 0.6117891042004491,
+        "mean_norm": 38.59005139280675
+      },
+      {
+        "pos": 13,
+        "n_eff": 1389,
+        "inter_sample_std": 0.6060899096856474,
+        "mean_norm": 37.008769573404706
+      },
+      {
+        "pos": 14,
+        "n_eff": 1059,
+        "inter_sample_std": 0.6041573592096898,
+        "mean_norm": 36.37846796988525
+      },
+      {
+        "pos": 15,
+        "n_eff": 788,
+        "inter_sample_std": 0.60102078112114,
+        "mean_norm": 35.891359313794275
+      },
+      {
+        "pos": 16,
+        "n_eff": 571,
+        "inter_sample_std": 0.6027739585849403,
+        "mean_norm": 35.740629321003276
+      },
+      {
+        "pos": 17,
+        "n_eff": 415,
+        "inter_sample_std": 0.596784541153587,
+        "mean_norm": 34.5756519007017
+      }
+    ]
+  }
+}
