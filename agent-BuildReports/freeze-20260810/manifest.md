@@ -3,7 +3,7 @@
 - **Freeze tag:** `exp-001-002-freeze-20260810`
 - **Generated:** 2026-08-10T19:37:39
 - **Git remote:** `git@github.com:MocryMin/layer-evidence-classification.git`
-- **HF dataset URI:** `PENDING (filled after upload, step 9)`
+- **HF dataset URI:** `https://huggingface.co/datasets/MocryMin/lec-exp-001-002-freeze` (private)
 - **Experiments:** EXP-20260729-001, EXP-20260729-002
 
 ## What is preserved where

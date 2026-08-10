@@ -2,7 +2,7 @@
   "freeze_tag": "exp-001-002-freeze-20260810",
   "generated_at": "2026-08-10T19:37:39",
   "git_remote": "git@github.com:MocryMin/layer-evidence-classification.git",
-  "hf_dataset_uri": null,
+  "hf_dataset_uri": "https://huggingface.co/datasets/MocryMin/lec-exp-001-002-freeze",
   "experiments": [
     "EXP-20260729-001",
     "EXP-20260729-002"
@@ -384,5 +384,10 @@
     "plots": "never generated; results are JSON/markdown tables, no figure files",
     "probe_checkpoints": "probe heads never checkpointed; results recorded as JSON"
   },
-  "hf_staging_total_bytes": 758980443
+  "hf_staging_total_bytes": 758980443,
+  "hf_dataset_visibility": "private",
+  "hf_upload_commits": {
+    "small_files": "33f5bafd2c36e2e1773148368f877e87773a878d",
+    "ft_backbone_weights": "572d5f1bfea9ee7f873727c0510a440849bbf8c6"
+  }
 }
