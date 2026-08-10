@@ -73,6 +73,19 @@ EXP-002 diagnostics (seed 17, frozen backbone unless noted), validation accuracy
   recoverability); FT does not fix mid-layer collapse but LN on the FT backbone
   reaches 0.93-0.97 on mid layers.
 
+## Freeze (2026-08-10)
+
+EXP-001/002 evidence is frozen for reproducibility:
+
+- **Git tag** `exp-001-002-freeze-20260810` (on `5ad36f4`): code, configs, reports,
+  tests, small summaries, manifest. `main` advanced to `f55481b` (HF URI recorded).
+- **HF private dataset** `MocryMin/lec-exp-001-002-freeze` (759 MB, 51 files): all
+  artifact result JSONs, FT-backbone best checkpoint, frozen `mlruns.db` snapshot,
+  manifest + dataset README. 1.66 GB rebuildable CLS caches excluded.
+- **Manifest:** `agent-BuildReports/freeze-20260810/manifest.md` (sha256 + sizes).
+- Per-sample predictions/logits, plots, and probe checkpoints were never produced
+  (experiments record aggregate JSON metrics + per-epoch histories) - marked N/A.
+
 ## Active blockers
 
 None for the diagnostics. EXP-001 mainline needs a protocol amendment before
