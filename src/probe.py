@@ -104,3 +104,97 @@ def train_probe(
                 best = {"best_epoch": epoch, "best_val_acc": acc, "best_val_nll": nll}
 
     return {"history": history, **best, "final_val_acc": history[-1]["val_acc"], "final_val_nll": history[-1]["val_nll"]}
+
+
+def train_probe_fullbatch_es(
+    head: nn.Module,
+    train_x: torch.Tensor,
+    train_y: torch.Tensor,
+    val_x: torch.Tensor,
+    val_y: torch.Tensor,
+    lr: float,
+    weight_decay: float,
+    grad_clip: float,
+    min_epochs: int,
+    max_epochs: int,
+    patience: int,
+    min_delta: float,
+    seed: int,
+    device: torch.device,
+) -> dict:
+    """Full-batch probe training with early stopping on validation accuracy.
+
+    Each epoch performs exactly one gradient step on the full training set
+    (no mini-batching, no shuffle). Early stopping: after ``min_epochs``, stop
+    if validation accuracy has not improved by ``>= min_delta`` for ``patience``
+    consecutive epochs. ``max_epochs`` is a hard cap; a run that reaches it
+    without early stopping is tagged as non-converged (inefficient under this
+    compute budget).
+
+    Checkpoint selection follows the EXP-001 convention: the epoch with the
+    highest validation accuracy, ties broken by lower validation NLL. The
+    best head state is retained in memory (CPU) for one-time test evaluation.
+
+    Returns ``{"history", "best_epoch", "best_val_acc", "best_val_nll",
+    "final_val_acc", "final_val_nll", "converged", "stop_reason",
+    "best_state"}``.
+    """
+    seed_all(seed)
+    head = head.to(device)
+    opt = _make_optimizer("adamw", head.parameters(), lr, weight_decay)
+
+    best = {"best_epoch": -1, "best_val_acc": -1.0, "best_val_nll": float("inf")}
+    best_state: dict | None = None
+    history: list[dict] = []
+    epochs_since_improve = 0
+    best_for_patience = -1.0  # val-acc reference for the min_delta patience test
+    stopped_early = False
+
+    for epoch in range(1, max_epochs + 1):
+        head.train()
+        opt.zero_grad()
+        logits = head(train_x)
+        loss = F.cross_entropy(logits, train_y)
+        loss.backward()
+        if grad_clip and grad_clip > 0:
+            torch.nn.utils.clip_grad_norm_(head.parameters(), grad_clip)
+        opt.step()
+
+        val_acc, val_nll = eval_probe(head, val_x, val_y)
+        history.append({
+            "epoch": epoch,
+            "train_loss": loss.item(),
+            "val_acc": val_acc,
+            "val_nll": val_nll,
+        })
+
+        # checkpoint selection: max val_acc, tie-break lower val_nll
+        ckpt_improved = (val_acc > best["best_val_acc"]) or (
+            val_acc == best["best_val_acc"] and val_nll < best["best_val_nll"]
+        )
+        if ckpt_improved:
+            best = {"best_epoch": epoch, "best_val_acc": val_acc, "best_val_nll": val_nll}
+            best_state = {k: v.detach().cpu().clone() for k, v in head.state_dict().items()}
+
+        # early-stopping patience: reset only on a min_delta improvement
+        if val_acc > best_for_patience + min_delta:
+            best_for_patience = val_acc
+            epochs_since_improve = 0
+        else:
+            epochs_since_improve += 1
+
+        if epoch >= min_epochs and epochs_since_improve >= patience:
+            stopped_early = True
+            break
+
+    return {
+        "history": history,
+        "best_epoch": best["best_epoch"],
+        "best_val_acc": best["best_val_acc"],
+        "best_val_nll": best["best_val_nll"],
+        "final_val_acc": history[-1]["val_acc"],
+        "final_val_nll": history[-1]["val_nll"],
+        "converged": stopped_early,
+        "stop_reason": "early_stop" if stopped_early else "max_epochs",
+        "best_state": best_state,
+    }

@@ -1,0 +1,116 @@
+# EXP-20260810-003 - Restore EXP-001 under a probe protocol that EXP-002 has shown to be valid.
+# Source: plans/EXP-20260810-003-*/EXP-20260810-003-*.md + AgentProtocol.md
+# Parent: EXP-20260729-001 (mainline paused). EXP-002 showed the plain linear probe
+# gives false negatives on mid layers (optimisation collapse, not absence of signal).
+# This experiment re-runs the 12-layer x 10-seed recoverability verification under
+# three probe families that EXP-002 validated: centered plain (main), LN plain
+# (robustness control), and RidgeClassifier alpha-grid (solver-independent reference).
+
+experiment_id: EXP-20260810-003
+parent_experiment: EXP-20260729-001
+title: "Intermediate-layer recoverability under validated probe protocols"
+
+# Model / dataset (identical to EXP-001)
+model_name: microsoft/deberta-v3-base
+model_path: models/deberta-v3-base
+sentencepiece_version: "0.2.2"
+dataset: CLINC150
+dataset_source: data/raw/clinc_oos
+dataset_config: plus
+drop_oos_label: 42
+n_classes: 150
+max_length: 512
+truncation: left
+pooling: cls
+cls_token_index: 0
+n_transformer_layers: 12
+final_layer: 12
+hidden_state_offset: 1
+head_input_dim: 768
+cache_dtype: float16
+training_dtype: float32
+
+# Cache reuse (EXP-001 hidden-state cache, with instruction prompt)
+cache_dir: artifacts/EXP-20260729-001/cache
+label_maps_dir: artifacts/EXP-20260729-001
+prompt: "Classify the intent: {utterance}"
+
+probe_layers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+
+# Probe families (plan §2)
+probe_families:
+  # Main method: centered plain. Same hypothesis class as EXP-001's plain probe
+  # (biased linear classifier, 115350 params); a fixed train-mean centering
+  # transform changes the optimisation geometry without adding parameters.
+  centered_plain:
+    head_type: plain            # src/heads.py::PlainHead
+    centering: train_mean       # subtract per-layer train-split mean mu_l (fixed, no leakage)
+    n_params: 115350            # 768*150 + 150
+    role: primary
+  # Robustness control: LN head. Sample-dependent LayerNorm before the linear
+  # classifier; +2*768 affine parameters (+1.33pp) over plain.
+  ln_plain:
+    head_type: ln               # src/heads.py::LNHead
+    centering: none
+    n_params: 116886            # 115350 + 2*768 (gamma + beta)
+    role: robustness_control
+  # Solver-independent reference: RidgeClassifier alpha grid. Closed-form;
+  # seed-agnostic (run once, no cross-seed CI). Decision scores are not CE-
+  # optimised, so probability-based metrics (NLL/margin/entropy/ECE) are skipped.
+  ridge:
+    head_type: ridge
+    centering: none
+    alphas: [0, 1.0e-6, 1.0e-5, 1.0e-4, 1.0e-3, 1.0e-2, 1.0e-1, 1, 10, 100]
+    alpha_0_implementation: ols_lstsq   # numpy.linalg.lstsq, one-hot targets, bias column
+    select_alpha_by: validation_accuracy
+    n_seeds: 1                  # deterministic, not repeated
+    role: solver_reference
+
+# Gradient-probe training config (centered_plain, ln_plain)
+# Plan §3.1: AdamW, lr=1e-2, full batch, wd=0, xavier. Matches EXP-002 03h B2/A1f
+# conditions. 1000ep and convergence are parallel caps: a method that does not
+# converge within 1000ep is tagged as inefficient (more compute would be unfair).
+training:
+  optimizer: AdamW
+  lr: 1.0e-2
+  weight_decay: 0.0
+  grad_clip: 0.0               # matches 03h (full-batch linear head, no clip needed)
+  batch_size: full             # full-batch: one gradient step per epoch on all 15000 samples
+  init: xavier_uniform
+  bias_init: zeros
+  min_epochs: 100
+  max_epochs: 1000
+  patience: 100
+  min_delta: 1.0e-4
+  monitor: validation_accuracy
+  checkpoint_selection:
+    primary: validation_accuracy
+    tie_breaker: validation_nll
+
+# Seeds (same 10 paired seeds as EXP-001, rule 4)
+seeds: [17, 29, 43, 59, 71, 89, 101, 127, 149, 173]
+
+# Hypothesis tolerances (inherited from EXP-001 §5)
+epsilon_1: 0.02    # H1 non-inferiority tolerance
+epsilon_2: 0.05    # H2 strong continuation criterion (oracle gain)
+
+# Bootstrap (inherited from EXP-001 §7)
+bootstrap_resamples: 10000
+bootstrap_ci: 0.95
+bootstrap_method: percentile
+
+# Accept protocol (plan §3.2)
+accept_protocol:
+  primary: centered_plain       # closest to EXP-001 setting
+  robustness_control: ln_plain
+  solver_reference: ridge
+  rules:
+    primary_accepts: "hypothesis supported"
+    all_three_accept: "hypothesis very strongly supported"
+    primary_refuses_controls_accept: "evidence exists but performance ordering is probe-sensitive"
+
+# Paths
+artifact_root: artifacts/EXP-20260810-003
+mlflow_tracking_uri: sqlite:///mlruns.db
+mlflow_experiment_name: EXP-20260810-003
+deterministic: true
