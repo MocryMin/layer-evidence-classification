@@ -2,9 +2,17 @@
 
 ## Current state
 
-EXP-20260729-001 (mainline recoverability run) is **paused**: its pure-linear-probe
-protocol was found to give false negatives on mid layers. Diagnostic campaign
-EXP-20260729-002 characterised the cause and is **complete** (report at
+EXP-20260810-003 (validated-probe recoverability verification) is **complete**
+(report at
+`agent-BuildReports/experiments/EXP-20260810-003--validated-probe-recoverability.md`).
+**$H_1$, $H_1'$, $H_2$ are all very strongly supported** across all three probe
+families (centered plain, LN plain, ridge). Mid layers are non-inferior to,
+superior to, and recoverable over the final layer on frozen DeBERTa-v3-base /
+CLINC150. The EXP-001 mainline pause is lifted; its verification is complete.
+
+EXP-20260729-001 (original plain-probe mainline) is **superseded** by EXP-003:
+its pure-linear-probe protocol gave false negatives on mid layers (optimisation
+collapse). EXP-20260729-002 diagnosed the cause and is **complete** (report at
 `agent-BuildReports/experiments/EXP-20260729-002--linear-probe-midlayer-collapse.md`).
 
 Key finding: frozen DeBERTa-v3-base mid-layer CLS has near-zero inter-sample
@@ -22,6 +30,20 @@ convergence from Xavier. **OLS-init + full-batch CE + early stop peaks at 0.919
 @ep8** (above OLS, with calibrated probabilities) - the tested probe for EXP-001.
 
 ## Latest valid result
+
+**EXP-003 (validated probes, 10 seeds, test accuracy):**
+- **Centered plain (primary, candidate L11):** L11 0.862 > L12 0.852
+  (d2=+0.009, CI [+0.008,+0.010]); oracle gain 0.115, R_oracle 0.78, D_JS 0.020.
+  92% of runs non-converged (hit 1000ep); signal still clear.
+- **LN plain (control, candidate L10):** L10 0.875 > L12 0.839
+  (d2=+0.036, CI [+0.033,+0.039]); oracle gain 0.143, R_oracle 0.89, D_JS 0.007.
+- **Ridge (reference, candidate L10, α=0 OLS):** L10 0.926 > L12 0.885
+  (d2=+0.041); oracle gain 0.097, R_oracle 0.84. L7-L10 all 0.925-0.928.
+- **Cross-family verdict: H1/H1'/H2 all very_strong.** Recoverability is broad
+  (D_JS 0.007-0.020), not concentrated in a few classes. L6 is the hardest mid
+  layer (centered 0.295, LN 0.602, ridge 0.914).
+- Artifacts: `artifacts/EXP-20260810-003/results.json` (gitignored; README
+  documents layout). MLflow run `364bf897628d443189b1ae6f1288fc6e`.
 
 EXP-002 diagnostics (seed 17, frozen backbone unless noted), validation accuracy:
 - Plain linear probe (AdamW, best lr 1e-2): layers 1/6 fail (0.13/0.03), layer 12 = 0.79.
@@ -88,22 +110,25 @@ EXP-001/002 evidence is frozen for reproducibility:
 
 ## Active blockers
 
-None for the diagnostics. EXP-001 mainline needs a protocol amendment before
-resuming (see decision). Probe choice now resolved by 03h: **OLS-init + full-batch
-CE + early stopping** (tested at 0.919 @ep8 on L6, gives calibrated probabilities).
+None. EXP-003 is complete; $H_{1-2}$ are accepted (very strong). EXP-001's
+plain-probe protocol is superseded - no further plain-probe runs needed.
 
 ## Next action
 
-Implement the OLS-init + full-batch CE + early-stop probe in `src/` (OLS init via
-Ridge α=1e-6; full-batch CE; wd≈0; early-stop on val acc, record peak epoch), with
-a unit test. Then re-run the probe-specific lr smoke test and proceed with the
-12-layer x 10-seed recoverability run and H1/H1'/H2 judgement.
+$H_{1-2}$ stand. Per the EXP-001 plan §3, the next steps (await user direction):
+- Scale to `modernBERT-base` and `modernBERT-large` as future major targets.
+- Consider non-CLS readouts (mean-pooling) - EXP-002 task 06 showed non-CLS
+  tokens do not collapse at mid layers.
+- `Qwen3-Embedding-0.6B` side verification (pending since EXP-001).
 
 ## Important paths
 
+- `agent-BuildReports/experiments/EXP-20260810-003--validated-probe-recoverability.md` - EXP-003 report
+- `artifacts/EXP-20260810-003/` - EXP-003 data (gitignored; README documents layout)
 - `agent-BuildReports/experiments/EXP-20260729-002--linear-probe-midlayer-collapse.md` - diagnostic report
 - `artifacts/EXP-20260729-002/` - diagnostic data (gitignored; README documents layout)
-- `artifacts/EXP-20260729-001/cache/` - shared frozen-backbone CLS cache
-- `configs/diag_config.yaml` - EXP-002 config; `configs/exp_config.yaml` - EXP-001 config
+- `artifacts/EXP-20260729-001/cache/` - shared frozen-backbone CLS cache (reused by EXP-003)
+- `configs/exp003_config.yaml` - EXP-003 config; `configs/diag_config.yaml` - EXP-002; `configs/exp_config.yaml` - EXP-001
 - `models/deberta-v3-base-clinc150-ft/` - FT backbone (task 3c, gitignored)
 - `plans/EXP-20260729-001--*/` - EXP-001 RP log + AgentProtocol
+- `plans/EXP-20260810-003-*/` - EXP-003 plan + AgentProtocol

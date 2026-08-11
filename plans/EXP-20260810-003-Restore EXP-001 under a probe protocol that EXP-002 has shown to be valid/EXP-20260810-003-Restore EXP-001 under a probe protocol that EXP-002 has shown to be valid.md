@@ -1,10 +1,10 @@
 ## 1. BASIC INFO
-- **Date**: `2026.8.10` 
-- **State**: 
-- **Verdict**: 
-- **Git Commit**: 
-- **MLflow run ID**: 
-- **Artifact Path**: 
+- **Date**: `2026.8.10` (run 2026-08-11)
+- **State**: COMPLETE
+- **Verdict**: H1, H1', H2 all **very_strong** (all three probe families support)
+- **Git Commit**: `58aee5e` (run on `9055c92` dirty)
+- **MLflow run ID**: `364bf897628d443189b1ae6f1288fc6e`
+- **Artifact Path**: `artifacts/EXP-20260810-003/`
 - **Data**: `CLINC150`
 - **Model**: `Deberta-v3-base`
 
