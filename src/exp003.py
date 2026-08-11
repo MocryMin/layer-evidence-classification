@@ -351,6 +351,9 @@ def _recoverability_to_json(rec: dict) -> dict:
         num, den, ratio = r
         return {"num": int(num), "den": int(den), "ratio": None if math.isnan(ratio) else float(ratio)}
 
+    def clean_ratio_dict(d):
+        return {str(k): clean_ratio(v) for k, v in d.items()}
+
     return {
         "acc_L": rec["acc_L"],
         "acc_oracle": rec["acc_oracle"],
@@ -358,8 +361,10 @@ def _recoverability_to_json(rec: dict) -> dict:
         "num_R_oracle": rec["num_R_oracle"],
         "denom_R_oracle": rec["denom_R_oracle"],
         "oracle_gain": rec["oracle_gain"],
-        "R_l": {str(l): clean_ratio(r) for l, r in rec["R_l"].items()},
-        "H_l": {str(l): clean_ratio(r) for l, r in rec["H_l"].items()},
+        "R_l": clean_ratio_dict(rec["R_l"]),
+        "H_l": clean_ratio_dict(rec["H_l"]),
+        "R_lc": clean_ratio_dict(rec["R_lc"]),   # {(layer, class): (num, den, ratio)}
+        "H_lc": clean_ratio_dict(rec["H_lc"]),
         "d_js_class": rec["d_js_class"],
         "n_err_c": rec["n_err_c"].tolist(),
         "n_rec_c": rec["n_rec_c"].tolist(),
