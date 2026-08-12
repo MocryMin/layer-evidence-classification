@@ -403,12 +403,21 @@ def classwise_summary(rec_json: dict) -> dict:
 # --------------------------------------------------------------------------- #
 # Report generation
 # --------------------------------------------------------------------------- #
+def _fmt(v) -> str:
+    """Report cell formatting: floats to 4 decimals, ints/strings as-is."""
+    if isinstance(v, float):
+        return f"{v:.4f}"
+    return str(v)
+
+
 def _fmt_table(rows: list[list], header: list[str]) -> str:
-    w = [max(len(str(r[i])) for r in rows + [header]) for i in range(len(header))]
+    rows = [[_fmt(c) for c in r] for r in rows]
+    header = [_fmt(c) for c in header]
+    w = [max(len(r[i]) for r in rows + [header]) for i in range(len(header))]
     line = "| " + " | ".join(f"{h:<{w[i]}}" for i, h in enumerate(header)) + " |"
     sep = "|" + "|".join("-" * (wi + 2) for wi in w) + "|"
     body = "\n".join(
-        "| " + " | ".join(f"{str(c):<{w[i]}}" for i, c in enumerate(r)) + " |"
+        "| " + " | ".join(f"{c:<{w[i]}}" for i, c in enumerate(r)) + " |"
         for r in rows)
     return f"{line}\n{sep}\n{body}"
 
@@ -454,8 +463,8 @@ def write_probe_report(exp_name: str, results: dict) -> Path:
             rpt.append(f"- `{fam}`: { {k: f'{v:.4f}' for k, v in d['val_acc'].items()} }"
                        f" -> lr = {d['chosen_lr']:g}")
 
-    for fam_name, fam in results["families"].items():
-        rpt.append(f"\n## 3. {fam_name} — layer-wise results\n")
+    for i, (fam_name, fam) in enumerate(results["families"].items(), start=3):
+        rpt.append(f"\n## {i}. {fam_name} — layer-wise results\n")
         rows = []
         for l in sorted(int(x) for x in fam["per_layer"]):
             p = fam["per_layer"][str(l)]
