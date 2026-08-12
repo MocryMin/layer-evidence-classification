@@ -64,7 +64,7 @@ def main():
     )
 
     l1_names = [d[0] for d in df["label_description"]]
-    l2_ids = np.flatnonzero(labels[:, N_L1:].T) % N_L2  # per-row L2 id
+    l2_ids = labels[:, N_L1:].argmax(1)  # per-row L2 id (one-hot block)
     summary = {
         "source": str(RAW),
         "split": "plain random, fixed seed (HYDRA counts only; original "

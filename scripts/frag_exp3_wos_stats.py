@@ -44,10 +44,13 @@ def main():
     split = np.load(SPLIT, allow_pickle=True)  # text column is object-dtype
     texts = split["text"]
     labels = split["labels"]  # (N, 141) uint8
-    l1_names = [d[0] for d in df["label_description"]]
-    l2_names = [d[1] for d in df["label_description"]]
-    l1 = np.flatnonzero(labels[:, :WOS_N_L1].T) % WOS_N_L1  # per-row L1 id
-    l2 = np.flatnonzero(labels[:, WOS_N_L1:].T) % WOS_N_L2  # per-row L2 id
+    # one-hot blocks: exactly one 1 in each block (verified below), so argmax
+    # gives the class id exactly (np.flatnonzero on the transpose is WRONG —
+    # the mod does not recover the row class id)
+    l1 = labels[:, :WOS_N_L1].argmax(1)
+    l2 = labels[:, WOS_N_L1:].argmax(1)
+    l1_names = [d[0].strip() for d in df["label_description"]]
+    l2_names = [d[1].strip() for d in df["label_description"]]
 
     print("[exp3] computing char + token lengths ...")
     char_lens = np.array([len(t) for t in texts], dtype=np.int64)
