@@ -88,8 +88,12 @@ Sources: `[RJ] → {family}.per_seed[*].per_layer[*].test_acc` (gradient),
 `[RJ] → ridge.per_layer[*].test_acc` (ridge); predictions at `[CP/s*]`,
 `[LN/s*]`, `[RIDGE]`.
 
-| Layer | Centered plain (10 seeds) | LN plain (10 seeds) | Ridge (1 run) |
+| Layer | Centered plain (mean ± std, 10 seeds) | LN plain (mean ± std, 10 seeds) | Ridge (1 run) |
 |------:|:-------------------------:|:-------------------:|:-------------:|
+
+> Note: `±` here is the cross-seed **standard deviation**, not a 95%
+> confidence interval. The 95% bootstrap CIs used for hypothesis judgement
+> are reported in §2 (computed on per-seed differences, not on accuracies).
 | 1 | 0.5750 ± 0.0005 | 0.7944 ± 0.0011 | 0.8287 |
 | 2 | 0.4810 ± 0.0004 | 0.8255 ± 0.0019 | 0.8644 |
 | 3 | 0.7309 ± 0.0003 | 0.8745 ± 0.0026 | 0.8927 |
@@ -112,7 +116,7 @@ L1–L10 and α=0.001 for L11–L12 (`[RJ] → ridge.per_layer[*].best_alpha`).
 Sources: `[RJ] → {family}.per_seed[*].per_layer[{cand}]` for acc/macro-F1/NLL/
 margins/entropy/ECE; raw logits at `[CP/s*.logits]` row `cand−1`.
 
-**Centered plain, candidate L11** vs **L12**:
+**Centered plain, candidate L11** vs **L12** (mean ± std over 10 seeds):
 
 | metric | L11 (candidate) | L12 (final) |
 |--------|:---:|:---:|
@@ -125,7 +129,7 @@ margins/entropy/ECE; raw logits at `[CP/s*.logits]` row `cand−1`.
 | entropy | 1.0765 ± 0.0170 | 1.0702 ± 0.0409 |
 | ECE (M=10) | 0.1089 ± 0.0029 | 0.1035 ± 0.0068 |
 
-**LN plain, candidate L10** vs **L12**:
+**LN plain, candidate L10** vs **L12** (mean ± std over 10 seeds):
 
 | metric | L10 (candidate) | L12 (final) |
 |--------|:---:|:---:|
