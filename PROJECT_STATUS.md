@@ -2,6 +2,15 @@
 
 ## Current state
 
+**Fragmented experiments gr1** (`plans/fragmented_exp_gr1.md`) is **complete**
+(2026-08-12, commit `9504dc8`): 5 single-point data-collection experiments —
+side verification of EXP-001/003 on Qwen3-Embedding-0.6B (last-token) and
+modernBERT-base (CLS) over CLINC150, plus WOS-46985 statistics and 134-L2
+baselines on DeBERTa-v3-base and modernBERT-base (HYDRA-count split
+30,070/7,518/9,397, seed 17). Reports under
+`agent-BuildReports/fragmented-experiments/*_260812_*.md`, artifacts under
+`artifacts/fragmented-experiments/` (see the gr1 section below).
+
 EXP-20260810-003 (validated-probe recoverability verification) is **complete**
 (report at
 `agent-BuildReports/experiments/EXP-20260810-003--validated-probe-recoverability.md`).
@@ -124,6 +133,37 @@ with convergence. min_delta=1e-4/patience=100 early stopping is strict and
 can cut off slow tail gains (centered L4 would stop at 8954 with ~0.72 vs
 0.807 at 20000).
 
+## Fragmented experiments gr1 (2026-08-12, complete)
+
+Single seed 17, frozen backbones, full-batch AdamW (10k ep, ES on val),
+probe families: gradient (plain | centered_plain by variance verdict) +
+LN plain + ridge grid. Reports/artifacts per AGENT_PROTOCOL §9.
+
+- **exp1 Qwen3Emb0p6bExp1Ver** (Qwen3-Emb-0.6B last-token x CLINC150):
+  healthy variance (min 0.030). L28 plain 0.9524 / ln 0.9580 / ridge 0.9536;
+  ridge mids L23 0.9556 / L25 0.9567 edge above L28. Oracle gain +0.041/+0.036/+0.035.
+- **exp2 ModernBERTBaseExp1Ver** (modernBERT CLS x CLINC150): healthy; final
+  L22 weak (plain 0.8253 vs deberta 0.852-0.885, qwen3 0.952). **Early layers
+  best: plain L2 0.8704 > L22**; L16 dip 0.697. Strongest oracle gains yet:
+  +0.146/+0.149/+0.117, D_JS 0.009-0.021, coverage 146/150.
+- **exp3 WOS46985Features**: 46985 docs; chars mean 1376 (median 1354), tokens
+  mean 262 (median 250, max 1463); L1: Medical 31.1%, Psychology 15.2%, CS
+  13.8%, biochemistry 12.1%, ECE 11.7%, Civil 9.0%, MAE 7.0%; all 134 L2
+  classes present in every split; no duplicates.
+- **exp4 DeBERTaV3BaseWOS46985Baseline** (deberta CLS x WOS 134-L2):
+  **mid-layer collapse REPRODUCES on WOS** (inter_std 2.4e-4 @ L6). L11 >
+  L12 under centered (0.320 > 0.281) and ln (0.311 > 0.285); ridge L5 0.4978
+  >> L12 0.3003 (+0.197). Oracle gains +0.363/+0.508/+0.438, R_oracle
+  0.51/0.71/0.63, coverage 134/134.
+- **exp5 ModernBERTBaseWOS46985Baseline** (modernBERT CLS x WOS 134-L2):
+  healthy; plain L1 0.4881 ≈ L22 0.4974, mids ~0.35. Oracle gains
+  +0.292/+0.308/+0.226, coverage 134/134.
+
+Cross-cutting: recoverability (H2) positive on every backbone/dataset; the
+deberta CLS collapse is dataset-independent; modernBERT CLS is healthy but a
+weak readout - its early layers carry the strongest signal; all 10k-ep
+gradient runs converged (early_stop).
+
 ## Active blockers
 
 None. EXP-003 is complete; $H_{1-2}$ are accepted (very strong). EXP-001's
@@ -131,7 +171,7 @@ plain-probe protocol is superseded - no further plain-probe runs needed.
 
 ## Next action
 
-$H_{1-2}$ stand. Per the EXP-001 plan §3, the next steps (await user direction):
+gr1 data collection complete. Per the EXP-001 plan §3, the next steps (await user direction):
 - Scale to `modernBERT-base` and `modernBERT-large` as future major targets.
 - Consider non-CLS readouts (mean-pooling) - EXP-002 task 06 showed non-CLS
   tokens do not collapse at mid layers.
@@ -148,3 +188,4 @@ $H_{1-2}$ stand. Per the EXP-001 plan §3, the next steps (await user direction)
 - `models/deberta-v3-base-clinc150-ft/` - FT backbone (task 3c, gitignored)
 - `plans/EXP-20260729-001--*/` - EXP-001 RP log + AgentProtocol
 - `plans/EXP-20260810-003-*/` - EXP-003 plan + AgentProtocol
+- `plans/fragmented_exp_gr1.md` - gr1 plan; `agent-BuildReports/fragmented-experiments/` - gr1 reports; `artifacts/fragmented-experiments/` - gr1 artifacts (gitignored)
