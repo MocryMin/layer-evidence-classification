@@ -17,6 +17,7 @@ from src.fragmented import (  # noqa: E402
     layer_variance_stats,
     load_clinc_plus,
     load_wos_46985,
+    lr_smoke,
     run_gradient_family_frag,
     run_ridge_family_frag,
 )
@@ -129,6 +130,18 @@ class TestProbeSuites(unittest.TestCase):
             self.assertIn(p["best_alpha"], {0.0, 1e-4, 1.0})
             self.assertIn("per_alpha", p)
         self.assertEqual(res["test_pred"].shape, (3, 80))
+
+    def test_lr_smoke_includes_final_layer(self):
+        """lr_smoke must pass [mid, final] to recoverability (regression)."""
+        hidden, labels = _tiny_data(n=120, layers=3, d=8, n_classes=5)
+        training = dict(lr=1e-2, weight_decay=0.0, grad_clip=0.0,
+                        min_epochs=1, max_epochs=10, patience=2,
+                        min_delta=1e-4, seed=17)
+        fams = [{"name": "plain", "head_type": "plain", "centering": "none"}]
+        chosen = lr_smoke(hidden, labels, fams, 1, [1e-2, 1e-3], training,
+                          [1, 2, 3], 3, 5, torch.device("cpu"))
+        self.assertEqual(set(chosen), {"plain"})
+        self.assertIn(chosen["plain"]["chosen_lr"], [1e-2, 1e-3])
 
 
 if __name__ == "__main__":

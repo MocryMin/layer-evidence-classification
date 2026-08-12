@@ -368,8 +368,9 @@ def lr_smoke(
         results = {}
         for lr in lrs:
             cfg = {**training, "lr": lr}
+            # final layer included: recoverability needs it in the layer list
             res = run_gradient_family_frag(
-                hidden, labels, fam, cfg, [mid_layer], final_layer,
+                hidden, labels, fam, cfg, [mid_layer, final_layer], final_layer,
                 n_classes, device)
             results[f"{lr:g}"] = res["per_layer"][str(mid_layer)]["best_val_acc"]
         best_lr = max(lrs, key=lambda l: (results[f"{l:g}"], -l))
