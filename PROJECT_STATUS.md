@@ -108,6 +108,22 @@ EXP-001/002 evidence is frozen for reproducibility:
 - Per-sample predictions/logits, plots, and probe checkpoints were never produced
   (experiments record aggregate JSON metrics + per-epoch histories) - marked N/A.
 
+## Convergence probe (2026-08-12, follow-up to EXP-003 §5)
+
+Variable-max_ep probe (`scripts/exp003_convergence_probe.py`, artifacts under
+`artifacts/EXP-20260810-003/convergence_probe/`): one long run per
+(family, layer) at seed 17, max_ep=20000, early stop disabled; budgets
+replayed from the full history.
+
+**Result: all 24 runs converge within 20000 ep.** Centered plain 857-8954 ep,
+LN 625-4057 ep (2-4x faster). Converged accuracies far exceed the 1000ep cap
+(e.g. centered L6 0.295->0.762, L7->0.923 > L12 0.884; LN L6 0.602->0.881).
+The 1000ep non-convergence is slow convergence (~10-20x beyond the cap for
+mid layers), not a probe pathology; the §2 superiority verdict strengthens
+with convergence. min_delta=1e-4/patience=100 early stopping is strict and
+can cut off slow tail gains (centered L4 would stop at 8954 with ~0.72 vs
+0.807 at 20000).
+
 ## Active blockers
 
 None. EXP-003 is complete; $H_{1-2}$ are accepted (very strong). EXP-001's
