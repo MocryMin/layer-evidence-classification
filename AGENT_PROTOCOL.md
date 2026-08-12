@@ -253,3 +253,21 @@ claim
 ```
 
 The goal is not merely working code, but work that a future session, collaborator, supervisor, or reviewer can understand and reproduce.
+
+---
+
+## 9. Fragmented Experiments
+
+Exploratory single-point experiments with no strict plan and no hypothesis:
+their purpose is data collection and direction exploration. Each experiment
+point is independent; no accept-protocol or hypothesis test is required.
+
+- Group plans live under `plans/fragmented_exp-*.md`.
+- Each single-point experiment yields one report:
+  `agent-BuildReports/fragmented-experiments/<name>_<YYMMDD>_<NN>.md`
+  (`<name>` = experiment name, `<YYMMDD>` = date, `<NN>` = daily index
+  starting from 01; e.g. `Qwen3Emb0p6bExp1Ver_260812_01.md`). The report
+  discloses the test configuration and the results.
+- Artifacts go to `artifacts/fragmented-experiments/<name>_<YYMMDD>_<NN>/`
+  (same naming as the report), gitignored.
+- Record config, results, and enough evidence to reproduce each point.
