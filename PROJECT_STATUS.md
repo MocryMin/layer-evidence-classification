@@ -2,6 +2,16 @@
 
 ## Current state
 
+**Fragmented experiments gr2** (`plans/fragmented_exp_gr2.md`) is **complete**
+(2026-08-13→14, commit `3cf29fb`+report commit): one data-collection
+experiment — `mudularized_layer_probe_260813_01`, DeBERTa-v3-base layer
+modules composed into arbitrary repeatable sequences (CLS readout at tail,
+ridge α=1e-6, CLINC150, val-only): 22,046 distinct path nodes (single,
+pairwise, greedy-to-50, 4,500 random paths). Report
+`agent-BuildReports/fragmented-experiments/mudularized_layer_probe_260813_01.md`;
+artifacts `artifacts/fragmented-experiments/mudularized_layer_probe_260813_01/`
+(see the gr2 section below).
+
 **Fragmented experiments gr1** (`plans/fragmented_exp_gr1.md`) is **complete**
 (2026-08-12, commit `9504dc8`): 5 single-point data-collection experiments —
 side verification of EXP-001/003 on Qwen3-Embedding-0.6B (last-token) and
@@ -164,6 +174,33 @@ deberta CLS collapse is dataset-independent; modernBERT CLS is healthy but a
 weak readout - its early layers carry the strongest signal; all 10k-ep
 gradient runs converged (early_stop).
 
+## Fragmented experiments gr2 (2026-08-13→14, complete)
+
+`mudularized_layer_probe_260813_01` — DeBERTa-v3-base layer modules composed
+into arbitrary repeatable sequences, CLS readout at tail, ridge α=1e-6
+(closed-form fp64, bit-equal to sklearn solver='svd'; modular raw chain
+bit-equal to the true model forward), CLINC150, train fit / val acc, seed 17,
+22,046 path nodes (prefix-trie reuse). Key numbers:
+
+- **Task 1 (single-layer-only vs in-place):** every layer ALONE is a strong
+  classifier (0.825–0.875 val); only L2 beats its in-place self (+0.004);
+  layers best in-place lose most in isolation (L7–10: −0.0797…−0.0943).
+  In-place α=1e-6 reproduces EXP-003 (L6 0.9173/0.9170, L10 0.9420/0.9420,
+  L12 0.9047/0.9030).
+- **Task 2 (greedy to len 50):** starts L2 (0.8750), step 1 +L11 → **0.8827**
+  (peak, == task-3 argmax), then 47/49 negative steps, monotone decay to
+  0.2183 at len 50; **max acc occurs BEFORE any negative step** (no recovery).
+- **Task 3 (pairwise):** A mean 0.8490, max `[2,11]` 0.8827; G max +0.0463
+  for `[1,2]` (raw-pipeline prefix); 42/144 pairs super-additive (top `[1,1]`
+  +0.0367).
+- **Task 4 (4500 random paths, len 3–12):** acc mean 0.6241, max 0.9093
+  (`[1,2,6,4,9]`); monotone decline with length (len3 0.8365 → len12 0.4136);
+  8/10 top paths start with `[1,2]`; repeats degrade (0.5791 vs 0.7865);
+  tail layer matters little (0.57–0.66).
+
+Infra: `scripts/frag_modular_probe.py` (arbitrary layer-sequence composition,
+trie DFS with branch-stack fp16 cache, resumable JSONL, wall-clock deadline).
+
 ## Active blockers
 
 None. EXP-003 is complete; $H_{1-2}$ are accepted (very strong). EXP-001's
@@ -171,11 +208,14 @@ plain-probe protocol is superseded - no further plain-probe runs needed.
 
 ## Next action
 
-gr1 data collection complete. Per the EXP-001 plan §3, the next steps (await user direction):
+gr2 data collection complete (await user direction). Per the EXP-001 plan §3:
 - Scale to `modernBERT-base` and `modernBERT-large` as future major targets.
 - Consider non-CLS readouts (mean-pooling) - EXP-002 task 06 showed non-CLS
   tokens do not collapse at mid layers.
 - `Qwen3-Embedding-0.6B` side verification (pending since EXP-001).
+- gr2 follow-ups if the user wants them: same modular probe on modernBERT-base
+  or WOS-46985; repeat-free path sampling; per-layer-composition diagnostics
+  of why stacks decay past depth 2.
 
 ## Important paths
 
@@ -189,3 +229,4 @@ gr1 data collection complete. Per the EXP-001 plan §3, the next steps (await us
 - `plans/EXP-20260729-001--*/` - EXP-001 RP log + AgentProtocol
 - `plans/EXP-20260810-003-*/` - EXP-003 plan + AgentProtocol
 - `plans/fragmented_exp_gr1.md` - gr1 plan; `agent-BuildReports/fragmented-experiments/` - gr1 reports; `artifacts/fragmented-experiments/` - gr1 artifacts (gitignored)
+- `plans/fragmented_exp_gr2.md` - gr2 plan; `scripts/frag_modular_probe.py` - gr2 runner; `agent-BuildReports/fragmented-experiments/mudularized_layer_probe_260813_01.md` - gr2 report; `artifacts/fragmented-experiments/mudularized_layer_probe_260813_01/` - gr2 artifacts (gitignored)
