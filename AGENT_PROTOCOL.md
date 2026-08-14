@@ -48,6 +48,11 @@ At session start:
 Do not overwrite, revert, or broadly reformat unrelated user changes.
 If repository state invalidates a plan, record the discrepancy and update the plan instead of silently improvising.
 
+**No invented basic facts:** session-specific or time-sensitive facts
+(deadlines, user availability, machine state, whether a run is still
+alive) are never carried over from earlier sessions or memory as
+assumptions — verify them against current evidence or ask the user.
+
 After a verified milestone, update `PROJECT_STATUS.md` when cross-session continuity is needed. Keep it short:
 
 - current verified state;

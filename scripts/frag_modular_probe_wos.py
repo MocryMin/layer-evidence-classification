@@ -297,6 +297,10 @@ def run_singles_pairs(stack, model, ids_tr, mask_tr, ids_va, mask_va, y_tr, y_va
     for i in range(1, n_layers + 1):
         if time.time() > deadline_ts:
             raise Deadline()
+        if (str(i) in rec.completed and
+                all(f"{i},{j}" in rec.completed
+                    for j in range(1, n_layers + 1))):
+            continue  # fully recorded in an earlier run (resume)
         cands = [j - 1 for j in range(1, n_layers + 1)]
         tr_path, tr_cands = chunk_pass(stack, model, ids_tr, mask_tr, [i - 1],
                                        cands, batch, chunk, device)
@@ -563,8 +567,13 @@ def main():
         print(f"[inplace] L1..L{n_layers} accs: "
               f"{[round(inplace[li]['val_acc'], 4) for li in range(1, n_layers + 1)]}")
     else:
-        inplace = {int(k): v for k, v in
-                   json.loads(inplace_path.read_text(encoding="utf-8")).items()}
+        inplace = {}
+        for k, v in json.loads(inplace_path.read_text(encoding="utf-8")).items():
+            try:
+                k = int(k)
+            except ValueError:
+                pass  # e.g. "L22_postnorm"
+            inplace[k] = v
 
     rec = NodeRecorder(d, args.resume)
     print(f"[resume] completed nodes loaded: {len(rec.completed)}")
