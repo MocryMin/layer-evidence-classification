@@ -2,14 +2,20 @@
 
 ## Current state
 
-**Fragmented experiments gr2** (`plans/fragmented_exp_gr2.md`) is **complete**
-(2026-08-13→14, commit `3cf29fb`+report commit): one data-collection
+**Fragmented experiments gr2** (`user_exp_plans/fragmented_exp_gr2.md`) is **complete**
+(2026-08-13→14, commit `3cf29fb`+report commits): one data-collection
 experiment — `mudularized_layer_probe_260813_01`, DeBERTa-v3-base layer
 modules composed into arbitrary repeatable sequences (CLS readout at tail,
 ridge α=1e-6, CLINC150, val-only): 22,046 distinct path nodes (single,
 pairwise, greedy-to-50, 4,500 random paths). Report
 `agent-BuildReports/fragmented-experiments/mudularized_layer_probe_260813_01.md`;
-artifacts `artifacts/fragmented-experiments/mudularized_layer_probe_260813_01/`
+follow-up data analysis per the user's plan
+(`user_exp_plans/gr2_data_analysis_plan.md`, commit `fad165e`, report
+`agent-BuildReports/fragmented-experiments/mudularized_layer_probe_260813_01_analysis.md`):
+class-conditioned transition utility is at the n=20/class noise floor;
+length dominates raw acc (R² 0.46), after residualization start_layer is the
+main signal (RF OOB R² 0.19); vocab top bigram `[1,11]`, worst `[12,12]`.
+Artifacts `artifacts/fragmented-experiments/mudularized_layer_probe_260813_01/`
 (see the gr2 section below).
 
 **Fragmented experiments gr1** (`plans/fragmented_exp_gr1.md`) is **complete**
@@ -228,5 +234,5 @@ gr2 data collection complete (await user direction). Per the EXP-001 plan §3:
 - `models/deberta-v3-base-clinc150-ft/` - FT backbone (task 3c, gitignored)
 - `plans/EXP-20260729-001--*/` - EXP-001 RP log + AgentProtocol
 - `plans/EXP-20260810-003-*/` - EXP-003 plan + AgentProtocol
-- `plans/fragmented_exp_gr1.md` - gr1 plan; `agent-BuildReports/fragmented-experiments/` - gr1 reports; `artifacts/fragmented-experiments/` - gr1 artifacts (gitignored)
-- `plans/fragmented_exp_gr2.md` - gr2 plan; `scripts/frag_modular_probe.py` - gr2 runner; `agent-BuildReports/fragmented-experiments/mudularized_layer_probe_260813_01.md` - gr2 report; `artifacts/fragmented-experiments/mudularized_layer_probe_260813_01/` - gr2 artifacts (gitignored)
+- `user_exp_plans/fragmented_exp_gr1.md` - gr1 plan; `agent-BuildReports/fragmented-experiments/` - gr1 reports; `artifacts/fragmented-experiments/` - gr1 artifacts (gitignored)
+- `user_exp_plans/fragmented_exp_gr2.md` - gr2 plan; `scripts/frag_modular_probe.py` - gr2 runner; `agent-BuildReports/fragmented-experiments/mudularized_layer_probe_260813_01.md` - gr2 report; `artifacts/fragmented-experiments/mudularized_layer_probe_260813_01/` - gr2 artifacts (gitignored); `user_exp_plans/gr2_data_analysis_plan.md` + `scripts/gr2_analysis.py` + `mudularized_layer_probe_260813_01_analysis.md` - gr2 data analysis
