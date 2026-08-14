@@ -153,7 +153,7 @@ def _write_plots(d, char_lens, tok_lens, split, l1):
 def _write_report(d, summary) -> Path:
     rpt = []
     rpt.append(f"# {EXP_NAME} — WOS-46985 dataset statistics\n")
-    rpt.append(f"Date: 2026-08-12 · Group: `plans/fragmented_exp_gr1.md` · "
+    rpt.append(f"Date: 2026-08-12 · Group: `user_exp_plans/fragmented_exp_gr1.md` · "
                f"Reporting model: deepseek-v4-flash · Git: "
                f"`{summary['git']['commit']}` (dirty={summary['git']['dirty']})\n")
     rpt.append("## Config\n")

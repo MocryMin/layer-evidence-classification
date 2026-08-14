@@ -262,7 +262,8 @@ Exploratory single-point experiments with no strict plan and no hypothesis:
 their purpose is data collection and direction exploration. Each experiment
 point is independent; no accept-protocol or hypothesis test is required.
 
-- Group plans live under `plans/fragmented_exp-*.md`.
+- Group plans live under `user_exp_plans/fragmented_exp-*.md` (renamed from
+  `plans/` on 2026-08-14; per-experiment plans under `user_exp_plans/EXP-*/`).
 - Each single-point experiment yields one report:
   `agent-BuildReports/fragmented-experiments/<name>_<YYMMDD>_<NN>.md`
   (`<name>` = experiment name, `<YYMMDD>` = date, `<NN>` = daily index

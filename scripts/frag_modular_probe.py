@@ -1,6 +1,6 @@
 """Run gr2 fragmented experiment: modularized layer probe (mudularized_layer_probe).
 
-`plans/fragmented_exp_gr2.md` — DeBERTa-v3-base on CLINC150, ridge classifier
+`user_exp_plans/fragmented_exp_gr2.md` — DeBERTa-v3-base on CLINC150, ridge classifier
 alpha=1e-6 (EXP-003 config). Layer modules are composed into arbitrary
 repeatable sequences ("paths"); CLS readout at the tail.
 
@@ -580,7 +580,7 @@ def main():
         "reporting_model": "deepseek-v4-flash",
         "git": git_state(),
         "config": {
-            "plan": "plans/fragmented_exp_gr2.md",
+            "plan": "user_exp_plans/fragmented_exp_gr2.md",
             "model": "deberta-v3-base (frozen)", "dataset": "clinc",
             "prompt": CLINC_PROMPT, "n_classes": N_CLASSES,
             "split_sizes": {"train": len(texts_tr), "validation": len(texts_va)},

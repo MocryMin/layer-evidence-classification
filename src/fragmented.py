@@ -422,12 +422,13 @@ def _fmt_table(rows: list[list], header: list[str]) -> str:
     return f"{line}\n{sep}\n{body}"
 
 
-def write_probe_report(exp_name: str, results: dict) -> Path:
+def write_probe_report(exp_name: str, results: dict, date: str = "2026-08-12",
+                       group: str = "user_exp_plans/fragmented_exp_gr1.md") -> Path:
     """Generate the single-point report md from a probe results dict."""
     cfg = results["config"]
     rpt = []
     rpt.append(f"# {exp_name} — {cfg['title']}\n")
-    rpt.append(f"Date: 2026-08-12 · Group: `plans/fragmented_exp_gr1.md` · "
+    rpt.append(f"Date: {date} · Group: `{group}` · "
                f"Reporting model: deepseek-v4-flash · Git: `{results['git']['commit']}`"
                f" (dirty={results['git']['dirty']}) · Single seed {cfg['seed']}\n")
 
