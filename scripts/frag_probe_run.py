@@ -60,10 +60,10 @@ EXPERIMENTS = {
         model_name="modernbert-base", model_path="models/modernbert-base",
         pooling="cls", n_layers=22, final_layer=22, smoke_layer=11,
         dataset="wos", max_length=512, batch_size=32),
-    # experiment name per user instruction (Qwen2Emb0p6...); the local model is
-    # Qwen3-Embedding-0.6B (no Qwen2-Embedding-0.6B exists on disk)
+    # user's "Qwen2Emb0p6" was a typo for Qwen3-Embedding-0.6B (confirmed
+    # 2026-08-14); naming follows gr1's Qwen3Emb0p6bExp1Ver style
     "qwen_wos": dict(
-        exp_name="Qwen2Emb0p6WOS46985Baseline_260814_01",
+        exp_name="Qwen3Emb0p6bWOS46985Baseline_260814_01",
         title="Qwen3-Embedding-0.6B last-token baseline on WOS-46985 (134 L2)",
         model_name="Qwen3-Embedding-0.6B", model_path="models/Qwen3-Embedding-0.6B",
         pooling="last_token", n_layers=28, final_layer=28, smoke_layer=14,
