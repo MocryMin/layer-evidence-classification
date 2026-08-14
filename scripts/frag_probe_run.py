@@ -60,6 +60,14 @@ EXPERIMENTS = {
         model_name="modernbert-base", model_path="models/modernbert-base",
         pooling="cls", n_layers=22, final_layer=22, smoke_layer=11,
         dataset="wos", max_length=512, batch_size=32),
+    # experiment name per user instruction (Qwen2Emb0p6...); the local model is
+    # Qwen3-Embedding-0.6B (no Qwen2-Embedding-0.6B exists on disk)
+    "qwen_wos": dict(
+        exp_name="Qwen2Emb0p6WOS46985Baseline_260814_01",
+        title="Qwen3-Embedding-0.6B last-token baseline on WOS-46985 (134 L2)",
+        model_name="Qwen3-Embedding-0.6B", model_path="models/Qwen3-Embedding-0.6B",
+        pooling="last_token", n_layers=28, final_layer=28, smoke_layer=14,
+        dataset="wos", max_length=512, batch_size=32, date="2026-08-14"),
 }
 
 
@@ -154,7 +162,7 @@ def main():
 
     # ---- probe families ------------------------------------------------- #
     results = {
-        "experiment": exp_name, "date": "2026-08-12",
+        "experiment": exp_name, "date": ecfg.get("date", "2026-08-12"),
         "reporting_model": "deepseek-v4-flash",
         "git": git_state(),
         "config": {
@@ -199,7 +207,9 @@ def main():
               f"families={list(results['families'])}")
         return
 
-    rpt = write_probe_report(exp_name, results)
+    rpt = write_probe_report(exp_name, results,
+                             date=ecfg.get("date", "2026-08-12"),
+                             group="user_exp_plans/fragmented_exp_gr1.md")
     print(f"[done] artifacts: {d}")
     print(f"[done] report:    {rpt}")
 
