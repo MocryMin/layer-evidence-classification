@@ -2,6 +2,20 @@
 
 ## Current state
 
+**gr2 tasks 1-3 × WOS-46985 runs — IN FLIGHT** (2026-08-14, runner
+`scripts/frag_modular_probe_wos.py`, commit `c7b6a2b`; chain
+`/tmp/run_wos_chain.sh`). User stopped machine ~17:00 on 2026-08-14;
+resume with `DEADLINE="<new>" bash /tmp/run_wos_chain.sh` (ask user for
+the deadline — protocol rule: no invented basic facts). State:
+- `DeBERTaV3BaseWOS46985LayerProbe_260814_01`: singles+pairs complete
+  (156 nodes); greedy 17/49 steps (all-negative gains, 0.5517→0.1652);
+  graceful finalize at 16:56 (results.json + task3_pairwise.npz written).
+- `ModernBERTBaseWOS46985LayerProbe_260814_02`: not started.
+- `Qwen3Emb0p6bWOS46985Baseline_260814_01` (frag_probe_run
+  `--experiment qwen_wos`): not started.
+Early finding: DeBERTa WOS modular singles (best L9 0.5517) beat in-place
+best (L5 0.504) — opposite of CLINC gr2.
+
 **Fragmented experiments gr2** (`user_exp_plans/fragmented_exp_gr2.md`) is **complete**
 (2026-08-13→14, commit `3cf29fb`+report commits): one data-collection
 experiment — `mudularized_layer_probe_260813_01`, DeBERTa-v3-base layer
