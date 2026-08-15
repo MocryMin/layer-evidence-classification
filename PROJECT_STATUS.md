@@ -2,17 +2,19 @@
 
 ## Current state
 
-**gr2 tasks 1-3 × WOS-46985 runs — IN FLIGHT** (2026-08-14, runner
-`scripts/frag_modular_probe_wos.py`, commit `c7b6a2b`; chain
-`/tmp/run_wos_chain.sh`). User stopped machine ~17:00 on 2026-08-14;
-resume with `DEADLINE="<new>" bash /tmp/run_wos_chain.sh` (ask user for
-the deadline — protocol rule: no invented basic facts). State:
-- `DeBERTaV3BaseWOS46985LayerProbe_260814_01`: singles+pairs complete
-  (156 nodes); greedy 17/49 steps (all-negative gains, 0.5517→0.1652);
-  graceful finalize at 16:56 (results.json + task3_pairwise.npz written).
-- `ModernBERTBaseWOS46985LayerProbe_260814_02`: not started.
-- `Qwen3Emb0p6bWOS46985Baseline_260814_01` (frag_probe_run
-  `--experiment qwen_wos`): not started.
+**gr2 tasks 1-3 × WOS-46985 runs — IN FLIGHT** (runner
+`scripts/frag_modular_probe_wos.py`, commit `c7b6a2b`+fixes; chain
+`/tmp/run_wos_chain.sh`, `DEADLINE`/`STOP_AT` env params; ask user for
+each day's deadline — no invented basic facts). State 2026-08-15 17:10:
+- `DeBERTaV3BaseWOS46985LayerProbe_260814_01`: **COMPLETE** (16:13) —
+  732 nodes, greedy 49/49 (46 negative-gain steps; max 0.5375 @ step 1,
+  final 0.0185). Report pending.
+- `ModernBERTBaseWOS46985LayerProbe_260814_02`: partial — singles+pairs
+  i=1..15 (345 nodes), greedy 0; resume completes i=16..22 (~30 min) +
+  greedy (~4.7 h).
+- `Qwen3Emb0p6bWOS46985Baseline_260814_01`: caches train+val extracted,
+  test missing; probes not started. frag_probe_run has no deadline —
+  guard its launch time in the chain.
 Early finding: DeBERTa WOS modular singles (best L9 0.5517) beat in-place
 best (L5 0.504) — opposite of CLINC gr2.
 
