@@ -335,6 +335,13 @@ def run_greedy(stack, model, ids_tr, mask_tr, ids_va, mask_va, y_tr, y_va,
         queue = list(steps[-1]["queue"])
         prev_acc = steps[-1]["val_acc"]
     else:
+        missing = [i for i in range(1, n_layers + 1)
+                   if str(i) not in rec.completed]
+        if missing:
+            print(f"[greedy] singles missing for layers {missing} — skipping "
+                  f"greedy; resume singles/pairs first")
+            f.close()
+            return []
         singles = {i: rec.completed[str(i)][0] for i in range(1, n_layers + 1)}
         best = max(singles, key=lambda i: (singles[i], -i))
         queue, prev_acc = [best], singles[best]
