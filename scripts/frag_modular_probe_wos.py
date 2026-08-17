@@ -272,24 +272,25 @@ def fit_ridge_torch(x_tr, y_tr, x_va, y_va, n_classes=N_CLASSES):
 class NodeRecorder:
     """Append-only node results (resumable); preds rows align with JSONL lines."""
 
-    def __init__(self, d: Path, resume: bool):
-        self.jsonl = d / "nodes.jsonl"
-        self.preds_path = d / "nodes_pred.npy"
+    def __init__(self, d: Path, resume: bool, jsonl_name: str = "nodes.jsonl",
+                 preds_name: str = "nodes_pred.npy"):
+        self.jsonl = d / jsonl_name
+        self.preds_path = d / preds_name
         self.completed: dict[str, tuple[float, float]] = {}
         self.preds: list[np.ndarray] = []
         if resume and self.jsonl.exists():
             for line in self.jsonl.read_text(encoding="utf-8").splitlines():
                 r = json.loads(line)
                 self.completed[",".join(map(str, r["path"]))] = (
-                    r["val_acc"], r["macro_f1"])
+                    r.get("val_acc", r.get("test_acc")), r["macro_f1"])
             if self.preds_path.exists():
                 arr = np.load(self.preds_path)
                 self.preds = [arr[i] for i in range(arr.shape[0])]
         self.f = self.jsonl.open("a", encoding="utf-8")
 
-    def record(self, path, tasks, acc, f1, pred):
+    def record(self, path, tasks, acc, f1, pred, acc_key="val_acc"):
         rec = {"path": list(path), "len": len(path), "tail_layer": path[-1],
-               "tasks": tasks, "val_acc": acc, "macro_f1": f1, "ts": time.time()}
+               "tasks": tasks, acc_key: acc, "macro_f1": f1, "ts": time.time()}
         self.f.write(json.dumps(rec) + "\n")
         self.f.flush()
         self.completed[",".join(map(str, path))] = (acc, f1)
@@ -396,6 +397,53 @@ def run_greedy(stack, model, batches_tr, batches_va, y_tr, y_va,
     return steps
 
 
+def run_singles_pairs_test(stack, model, batches_tr, batches_va, batches_te,
+                          y_tr, y_va, y_te, rec, ref_singles, deadline_ts,
+                          n_layers, device):
+    """gr3 step 2 replay: refit ridge (train) for singles + pairs and record
+    TEST predictions for the class-conditioned transition-utility analysis.
+
+    Ridge weights were not persisted in the original run, so train is
+    re-forwarded (identical fp16 pipeline -> same closed-form fit). Singles
+    additionally re-evaluate val as a cross-check against the original
+    nodes.jsonl val accs; pairs record test only.
+    """
+    cands = [j - 1 for j in range(1, n_layers + 1)]
+    for i in range(1, n_layers + 1):
+        if time.time() > deadline_ts:
+            raise Deadline()
+        if (str(i) in rec.completed and
+                all(f"{i},{j}" in rec.completed
+                    for j in range(1, n_layers + 1))):
+            continue
+        tr_path, tr_cands = chunk_pass(stack, model, batches_tr, [i - 1],
+                                       cands, device)
+        te_path, te_cands = chunk_pass(stack, model, batches_te, [i - 1],
+                                       cands, device)
+        if str(i) not in rec.completed:
+            acc, f1, pred = fit_ridge_torch(tr_path, y_tr, te_path, y_te)
+            va_path, _ = chunk_pass(stack, model, batches_va, [i - 1], [],
+                                    device)
+            acc_va, _, _ = fit_ridge_torch(tr_path, y_tr, va_path, y_va)
+            rec.record((i,), ["single_test"], acc, f1, pred, acc_key="test_acc")
+            rec.completed[str(i)] = (acc, f1)  # key as val for resume logic
+            dev = abs(acc_va - ref_singles[str(i)])
+            print(f"[replay-test] single L{i:2d}: test={acc:.4f} "
+                  f"val={acc_va:.4f} (orig {ref_singles[str(i)]:.4f}, "
+                  f"dev={dev:.4f})")
+            assert dev < 0.002, f"val cross-check failed for single L{i}"
+        for j in range(1, n_layers + 1):
+            key = f"{i},{j}"
+            if key in rec.completed:
+                continue
+            acc, f1, pred = fit_ridge_torch(tr_cands[j - 1], y_tr,
+                                            te_cands[j - 1], y_te)
+            rec.record((i, j), ["pair_test"], acc, f1, pred,
+                       acc_key="test_acc")
+        rec.flush_preds()
+        print(f"[replay-test] i={i:2d} done · {len(rec.completed)} nodes")
+
+
 # --------------------------------------------------------------------------- #
 # Smoke checks
 # --------------------------------------------------------------------------- #
@@ -492,6 +540,9 @@ def main():
     ap.add_argument("--time-probe", action="store_true")
     ap.add_argument("--resume", action="store_true")
     ap.add_argument("--deadline", default="2026-08-15 08:00")
+    ap.add_argument("--replay-test", action="store_true",
+                    help="gr3 step 2: refit singles+pairs on train, record "
+                         "test preds (class-conditioned gain analysis)")
     ap.add_argument("--greedy-max-len", type=int, default=50)
     ap.add_argument("--seed", type=int, default=17)
     args = ap.parse_args()
@@ -606,6 +657,29 @@ def main():
                   f"base_a1e6={v['baseline_a1e6_val_acc']:.4f} "
                   f"base_best={v['baseline_best_val_acc']:.4f}")
         rec.close()
+        return
+
+    # ---- gr3 step 2: test replay for the transition-utility analysis ---- #
+    if args.replay_test:
+        assert args.model == "deberta", "gr3 step 2 replays the DeBERTa run"
+        texts_te, y_np_te = data["test"]
+        batches_te = tokenize_batches(tok, texts_te, batch)
+        y_te = torch.as_tensor(y_np_te, dtype=torch.long, device=device)
+        ref = {}
+        for line in (d / "nodes.jsonl").read_text(encoding="utf-8").splitlines():
+            r = json.loads(line)
+            if r["tasks"] == ["single"]:
+                ref[str(r["path"][0])] = r["val_acc"]
+        assert len(ref) == n_layers, "original singles incomplete"
+        rec = NodeRecorder(d, args.resume, "nodes_test.jsonl",
+                           "nodes_test_pred.npy")
+        print(f"[replay-test] resume nodes: {len(rec.completed)}")
+        run_singles_pairs_test(stack, model, batches_tr, batches_va,
+                               batches_te, y_tr, y_va, y_te, rec, ref,
+                               deadline_ts, n_layers, device)
+        rec.flush_preds()
+        rec.close()
+        print(f"[replay-test] done · {len(rec.completed)} nodes")
         return
 
     # ---- tasks 1 + 3 (singles + pairs) ----------------------------------- #
