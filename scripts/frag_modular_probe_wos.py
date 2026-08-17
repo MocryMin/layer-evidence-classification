@@ -23,15 +23,17 @@ WOS-46985: HYDRA-count split 30070/7518/9397 (seed 17), 134 L2 classes,
 max_length 512 (gr1 baseline config; median doc length 250 tokens).
 
 VRAM strategy: a full-length fp16 state for the whole train split is
-~23.6 GB and cannot be materialized, so all forwards stream doc-chunks
-with fp16 states; per-branch cost is len(path) layer applications per
-chunk (embeddings are recomputed per branch, they are cheap). Per-model
-batch/chunk in MODELS: deberta 128/2048 (legacy disentangled attention
-materializes fp32 scores per batch — 256/4096 peaked at 29.5 GiB reserved
-and WDDM-paged), modernbert 256/2048 (mask tensors scale with chunk;
-measured peak reserved 11.8 GiB). All states and layer compute are fp16
-(weights loaded fp16); the ridge solve is fp64 closed form
-(sklearn-equivalent), as in gr2.
+~23.6 GB and cannot be materialized, so all forwards run per-batch with
+fp16 states; per-branch cost is len(path) layer applications per batch
+(embeddings are recomputed per branch, they are cheap). Padding is
+per-batch longest (gr1 baseline extraction semantics — fixed-512 padding
+was found to systematically lower modernbert accuracies by ~0.02-0.03,
+2026-08-17). Per-model batch in MODELS: deberta 128 (legacy disentangled
+attention materializes fp32 scores per batch — fixed-512 at 256/4096
+peaked at 29.5 GiB reserved and WDDM-paged), modernbert 256 (mask tensors
+scale with batch; measured peak reserved ~12 GiB). All states and layer
+compute are fp16 (weights loaded fp16); the ridge solve is fp64 closed
+form (sklearn-equivalent), as in gr2.
 
 Usage:
     python scripts/frag_modular_probe_wos.py --model deberta --smoke
@@ -64,27 +66,26 @@ from src.seeding import enable_determinism  # noqa: E402
 
 N_CLASSES = 134
 ALPHA = 1e-6
-BATCH = 256
-CHUNK = 4096
 MAX_LEN = 512
 
 MODELS = {
     # VRAM: DeBERTa-v3 uses legacy disentangled attention (fp32 scores per
     # batch) — batch 128 keeps transients ~3.2 GiB; modernbert mask tensors
-    # scale with chunk — chunk 2048 keeps peak reserved ~14 GiB. Measured
-    # 2026-08-14: batch 256/chunk 4096 hit reserved 29.5 GiB on deberta
-    # (WDDM paging, ~7x slowdown); fixed by these settings.
+    # scale with batch — batch 256 keeps peak reserved ~12 GiB. Measured
+    # 2026-08-14: fixed-512 padding at batch 256/chunk 4096 hit reserved
+    # 29.5 GiB on deberta (WDDM paging, ~7x slowdown); longest-per-batch
+    # padding removed the chunk dimension entirely (states are per-batch).
     "deberta": dict(
         name="DeBERTaV3BaseWOS46985LayerProbe_260814_01",
         path="models/deberta-v3-base",
         baseline_art="DeBERTaV3BaseWOS46985Baseline_260812_04",
-        batch=128, chunk=2048,
+        batch=128,
     ),
     "modernbert": dict(
         name="ModernBERTBaseWOS46985LayerProbe_260814_02",
         path="models/modernbert-base",
         baseline_art="ModernBERTBaseWOS46985Baseline_260812_05",
-        batch=256, chunk=2048,
+        batch=256,
     ),
 }
 
@@ -128,7 +129,7 @@ class StackModernBert:
         self.am = self.pe = None
 
     def prepare(self, x0_c, mask_c):
-        """Per-chunk constants (depend only on shape/dtype/mask, not values)."""
+        """Per-batch constants (depend only on shape/dtype/mask, not values)."""
         kw = dict(config=self.model.config, inputs_embeds=x0_c,
                   attention_mask=mask_c)
         self.am = {
@@ -172,49 +173,64 @@ def apply_path(stack, x0, mask_c, path, batch) -> torch.Tensor:
 
 
 @torch.no_grad()
-def chunk_pass(stack, model, tok_ids, mask, path, cands, batch, chunk, device):
-    """Streamed multi-branch forward.
+def chunk_pass(stack, model, batches, path, cands, device):
+    """Streamed multi-branch forward over tokenized batches.
 
-    For each doc-chunk: x0 = embeddings, h = apply(path), then every
-    candidate layer applied on h. Returns (path_cls, cand_cls) — [N, D] fp16
-    CLS tensors on device (path_cls = embeddings CLS when path == []).
+    ``batches`` is the list of (ids_b, mask_b) from :func:`tokenize_batches`
+    (per-batch longest padding — matches the gr1 baseline extraction; fixed
+    512 padding was found to systematically LOWER modernbert accuracies by
+    ~0.02-0.03, see baseline_crosscheck, 2026-08-17). For each batch:
+    x0 = embeddings, h = apply(path), then every candidate layer applied
+    on h. Returns (path_cls, cand_cls) — [N, D] fp16 CLS tensors on device.
     """
-    n = tok_ids.shape[0]
+    n = sum(b[0].shape[0] for b in batches)
     D = model.config.hidden_size
     path_cls = torch.empty((n, D), dtype=torch.float16, device=device)
     cand_cls = {li: torch.empty((n, D), dtype=torch.float16, device=device)
                 for li in cands}
-    for s in range(0, n, chunk):
-        e = s + chunk
-        ids_c = tok_ids[s:e].to(device)
-        mask_c = mask[s:e].to(device)
+    off = 0
+    for ids_b, mask_b in batches:
+        b = ids_b.shape[0]
+        ids_c, mask_c = ids_b.to(device), mask_b.to(device)
         x0 = embeddings(model, ids_c, mask_c)
         if isinstance(stack, StackModernBert):
             stack.prepare(x0, mask_c)
-        h = apply_path(stack, x0, mask_c, path, batch)
-        path_cls[s:e] = h[:, 0]
+        h = apply_path(stack, x0, mask_c, path, b)
+        path_cls[off:off + b] = h[:, 0]
         for li in cands:
-            cand_cls[li][s:e] = apply_batched(stack, h, mask_c, li, batch)[:, 0]
+            cand_cls[li][off:off + b] = apply_batched(stack, h, mask_c, li, b)[:, 0]
+        off += b
     return path_cls, cand_cls
 
 
+def tokenize_batches(tok, texts, bs):
+    """Per-batch longest padding (gr1 baseline extraction semantics)."""
+    out = []
+    for s in range(0, len(texts), bs):
+        enc = tok(texts[s:s + bs], padding="longest", truncation=True,
+                  max_length=MAX_LEN, return_tensors="pt")
+        out.append((enc["input_ids"], enc["attention_mask"].long()))
+    return out
+
+
 @torch.no_grad()
-def collect_inplace(stack, model, tok_ids, mask, n_layers, batch, chunk, device):
+def collect_inplace(stack, model, batches, n_layers, device):
     """Pre-norm CLS per layer of the raw chain (trained order) -> {1..L: [N,D]}."""
-    n = tok_ids.shape[0]
+    n = sum(b[0].shape[0] for b in batches)
     D = model.config.hidden_size
     out = {li: torch.empty((n, D), dtype=torch.float16, device=device)
            for li in range(1, n_layers + 1)}
-    for s in range(0, n, chunk):
-        e = s + chunk
-        ids_c = tok_ids[s:e].to(device)
-        mask_c = mask[s:e].to(device)
+    off = 0
+    for ids_b, mask_b in batches:
+        b = ids_b.shape[0]
+        ids_c, mask_c = ids_b.to(device), mask_b.to(device)
         h = embeddings(model, ids_c, mask_c)
         if isinstance(stack, StackModernBert):
             stack.prepare(h, mask_c)
         for li in range(n_layers):
-            h = apply_batched(stack, h, mask_c, li, batch)
-            out[li + 1][s:e] = h[:, 0]
+            h = apply_batched(stack, h, mask_c, li, b)
+            out[li + 1][off:off + b] = h[:, 0]
+        off += b
     return out
 
 
@@ -290,9 +306,8 @@ class NodeRecorder:
 # --------------------------------------------------------------------------- #
 # Tasks
 # --------------------------------------------------------------------------- #
-def run_singles_pairs(stack, model, ids_tr, mask_tr, ids_va, mask_va, y_tr, y_va,
-                      rec, deadline_ts, n_layers, batch, chunk, device,
-                      print_every=10):
+def run_singles_pairs(stack, model, batches_tr, batches_va, y_tr, y_va,
+                      rec, deadline_ts, n_layers, device, print_every=10):
     """Task 1 (singles) + task 3 (pairs): one chunk_pass per i covers [i] + [i,j]."""
     for i in range(1, n_layers + 1):
         if time.time() > deadline_ts:
@@ -302,10 +317,10 @@ def run_singles_pairs(stack, model, ids_tr, mask_tr, ids_va, mask_va, y_tr, y_va
                     for j in range(1, n_layers + 1))):
             continue  # fully recorded in an earlier run (resume)
         cands = [j - 1 for j in range(1, n_layers + 1)]
-        tr_path, tr_cands = chunk_pass(stack, model, ids_tr, mask_tr, [i - 1],
-                                       cands, batch, chunk, device)
-        va_path, va_cands = chunk_pass(stack, model, ids_va, mask_va, [i - 1],
-                                       cands, batch, chunk, device)
+        tr_path, tr_cands = chunk_pass(stack, model, batches_tr, [i - 1],
+                                       cands, device)
+        va_path, va_cands = chunk_pass(stack, model, batches_va, [i - 1],
+                                       cands, device)
         if str(i) not in rec.completed:
             acc, f1, pred = fit_ridge_torch(tr_path, y_tr, va_path, y_va)
             rec.record((i,), ["single"], acc, f1, pred)
@@ -322,9 +337,8 @@ def run_singles_pairs(stack, model, ids_tr, mask_tr, ids_va, mask_va, y_tr, y_va
             rec.flush_preds()
 
 
-def run_greedy(stack, model, ids_tr, mask_tr, ids_va, mask_va, y_tr, y_va,
-               rec, steps_path, deadline_ts, max_len, n_layers, batch, chunk,
-               device):
+def run_greedy(stack, model, batches_tr, batches_va, y_tr, y_va,
+               rec, steps_path, deadline_ts, max_len, n_layers, device):
     """Task 2: greedy queue growth from the best single layer; repeats allowed."""
     steps = []
     if steps_path.exists():
@@ -351,10 +365,10 @@ def run_greedy(stack, model, ids_tr, mask_tr, ids_va, mask_va, y_tr, y_va,
         if time.time() > deadline_ts:
             raise Deadline()
         path = [li - 1 for li in queue]  # queue is 1-based; apply is 0-based
-        tr_path, tr_cands = chunk_pass(stack, model, ids_tr, mask_tr, path,
-                                       cands, batch, chunk, device)
-        va_path, va_cands = chunk_pass(stack, model, ids_va, mask_va, path,
-                                       cands, batch, chunk, device)
+        tr_path, tr_cands = chunk_pass(stack, model, batches_tr, path,
+                                       cands, device)
+        va_path, va_cands = chunk_pass(stack, model, batches_va, path,
+                                       cands, device)
         cand_accs = {}
         for li in range(1, n_layers + 1):
             key = ",".join(map(str, queue + [li]))
@@ -385,13 +399,13 @@ def run_greedy(stack, model, ids_tr, mask_tr, ids_va, mask_va, y_tr, y_va,
 # --------------------------------------------------------------------------- #
 # Smoke checks
 # --------------------------------------------------------------------------- #
-def run_smoke_checks(stack, model, ids_tr, mask_tr, y_tr, y_va, inplace_tr,
+def run_smoke_checks(stack, model, batches_tr, y_tr, y_va, inplace_tr,
                      inplace_va, n_layers, d, device):
     from sklearn.linear_model import RidgeClassifier
 
     checks = {}
-    ids = ids_tr[:64].to(device)
-    mask = mask_tr[:64].to(device)
+    ids = batches_tr[0][0][:64].to(device)
+    mask = batches_tr[0][1][:64].to(device)
     with torch.no_grad():
         o = model(ids, attention_mask=mask, output_hidden_states=True)
         x0 = embeddings(model, ids, mask)
@@ -485,7 +499,7 @@ def main():
     enable_determinism()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     mcfg = MODELS[args.model]
-    batch, chunk = mcfg["batch"], mcfg["chunk"]
+    batch = mcfg["batch"]
     d = exp_dir(mcfg["name"])
     deadline_ts = parse_deadline(args.deadline)
     print(f"[{mcfg['name']}] device={device} deadline={args.deadline} "
@@ -507,13 +521,12 @@ def main():
         y_np_va = y_np_va[idx_va]
 
     tok = AutoTokenizer.from_pretrained(str(ROOT / mcfg["path"]))
-    enc_tr = tok(texts_tr, padding="max_length", max_length=MAX_LEN,
-                 truncation=True, return_tensors="pt")
-    enc_va = tok(texts_va, padding="max_length", max_length=MAX_LEN,
-                 truncation=True, return_tensors="pt")
-    ids_tr, mask_tr = enc_tr["input_ids"], enc_tr["attention_mask"].long()
-    ids_va, mask_va = enc_va["input_ids"], enc_va["attention_mask"].long()
-    print(f"[tok] max_length={MAX_LEN} truncation=right")
+    # per-batch longest padding (gr1 baseline extraction semantics; fixed-512
+    # padding was found to systematically lower modernbert accuracies)
+    batches_tr = tokenize_batches(tok, texts_tr, batch)
+    batches_va = tokenize_batches(tok, texts_va, batch)
+    print(f"[tok] max_length={MAX_LEN} truncation=right padding=longest "
+          f"({len(batches_tr)} batches of <= {batch})")
 
     # weights fp16: direct layer-module calls compute in fp16 (states fp16);
     # ridge is fp64 closed form on the fp16 CLS (gr2 stack-mode precedent)
@@ -531,10 +544,8 @@ def main():
         assert not args.smoke
         for rep in range(2):
             t0 = time.time()
-            _, _ = chunk_pass(stack, model, ids_tr, mask_tr, [0], [1],
-                              batch, chunk, device)
-            _, _ = chunk_pass(stack, model, ids_va, mask_va, [0], [1],
-                              batch, chunk, device)
+            _, _ = chunk_pass(stack, model, batches_tr, [0], [1], device)
+            _, _ = chunk_pass(stack, model, batches_va, [0], [1], device)
             t1 = time.time()
             G = torch.randn(768, 768, dtype=torch.float64, device=device)
             G = G.t() @ G
@@ -551,10 +562,8 @@ def main():
     if args.smoke or not inplace_path.exists():
         print("[inplace] raw chain per layer...")
         t0 = time.time()
-        inplace_tr = collect_inplace(stack, model, ids_tr, mask_tr, n_layers,
-                                     batch, chunk, device)
-        inplace_va = collect_inplace(stack, model, ids_va, mask_va, n_layers,
-                                     batch, chunk, device)
+        inplace_tr = collect_inplace(stack, model, batches_tr, n_layers, device)
+        inplace_va = collect_inplace(stack, model, batches_va, n_layers, device)
         print(f"[inplace] forwards done in {time.time() - t0:.1f}s; fitting...")
         inplace = {}
         for li in range(1, n_layers + 1):
@@ -587,7 +596,7 @@ def main():
 
     # ---- smoke mode ------------------------------------------------------ #
     if args.smoke:
-        checks = run_smoke_checks(stack, model, ids_tr, mask_tr, y_tr, y_va,
+        checks = run_smoke_checks(stack, model, batches_tr, y_tr, y_va,
                                   inplace_tr, inplace_va, n_layers, d, device)
         print(json.dumps(checks, indent=2))
         cc = baseline_crosscheck(d, mcfg["baseline_art"], n_layers)
@@ -603,9 +612,8 @@ def main():
     print("[singles/pairs] ...")
     t0 = time.time()
     try:
-        run_singles_pairs(stack, model, ids_tr, mask_tr, ids_va, mask_va,
-                          y_tr, y_va, rec, deadline_ts, n_layers, batch, chunk,
-                          device)
+        run_singles_pairs(stack, model, batches_tr, batches_va,
+                          y_tr, y_va, rec, deadline_ts, n_layers, device)
     except Deadline:
         print("[stop] deadline reached during singles/pairs")
     else:
@@ -616,10 +624,9 @@ def main():
     print("[greedy] ...")
     t0 = time.time()
     try:
-        steps = run_greedy(stack, model, ids_tr, mask_tr, ids_va, mask_va,
+        steps = run_greedy(stack, model, batches_tr, batches_va,
                            y_tr, y_va, rec, d / "greedy_steps.jsonl",
-                           deadline_ts, args.greedy_max_len, n_layers, batch,
-                           chunk, device)
+                           deadline_ts, args.greedy_max_len, n_layers, device)
     except Deadline:
         steps_path = d / "greedy_steps.jsonl"
         steps = ([json.loads(l) for l in
@@ -680,7 +687,10 @@ def main():
             "median doc 250 tokens)",
             "pooling": "cls (pre-norm for every layer; final_norm excluded "
             "from modernbert layer modules)", "seed": args.seed,
-            "batch": batch, "chunk": chunk,
+            "batch": batch,
+            "padding": "per-batch longest (gr1 baseline extraction semantics; "
+            "fixed-512 padding was found to systematically lower modernbert "
+            "accuracies by ~0.02-0.03, 2026-08-17)",
             "ridge": {"alpha": ALPHA, "method": "closed-form eigen-solve fp64, "
                       "sklearn-equivalent (RidgeClassifier solver='svd', "
                       "fit_intercept=True)", "fit": "train", "eval": "validation"},
@@ -688,8 +698,8 @@ def main():
             "all per-application inputs (attention masks, relative position, "
             "RoPE) are position/mask-only constants; raw chain == true model "
             "forward (smoke-verified)",
-            "streaming": "fp16 doc-chunks (no full-sequence materialization; "
-            "full train state would be ~23.6 GB fp16)",
+            "streaming": "fp16 per-batch states (no full-sequence "
+            "materialization; full train state would be ~23.6 GB fp16)",
             "greedy": {"max_queue_len": args.greedy_max_len, "allow_repeat": True,
                        "tie_break": "higher val acc, then lower layer index"},
             "deadline": args.deadline,
