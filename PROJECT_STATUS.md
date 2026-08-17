@@ -2,21 +2,24 @@
 
 ## Current state
 
-**gr2 tasks 1-3 × WOS-46985 runs — IN FLIGHT** (runner
-`scripts/frag_modular_probe_wos.py`, commit `c7b6a2b`+fixes; chain
-`/tmp/run_wos_chain.sh`, `DEADLINE`/`STOP_AT` env params; ask user for
-each day's deadline — no invented basic facts). State 2026-08-15 17:10:
-- `DeBERTaV3BaseWOS46985LayerProbe_260814_01`: **COMPLETE** (16:13) —
-  732 nodes, greedy 49/49 (46 negative-gain steps; max 0.5375 @ step 1,
-  final 0.0185). Report pending.
-- `ModernBERTBaseWOS46985LayerProbe_260814_02`: partial — singles+pairs
-  i=1..15 (345 nodes), greedy 0; resume completes i=16..22 (~30 min) +
-  greedy (~4.7 h).
-- `Qwen3Emb0p6bWOS46985Baseline_260814_01`: caches train+val extracted,
-  test missing; probes not started. frag_probe_run has no deadline —
-  guard its launch time in the chain.
-Early finding: DeBERTa WOS modular singles (best L9 0.5517) beat in-place
-best (L5 0.504) — opposite of CLINC gr2.
+**gr2 tasks 1-3 × WOS-46985 runs — COMPLETE** (runner
+`scripts/frag_modular_probe_wos.py`; reports:
+`agent-BuildReports/fragmented-experiments/{DeBERTaV3BaseWOS46985LayerProbe_260814_01,
+ModernBERTBaseWOS46985LayerProbe_260814_02}.md`; C:
+`Qwen3Emb0p6bWOS46985Baseline_260814_01.md`). Key results:
+- **DeBERTa**: singles (best L9 0.5517) beat in-place at EVERY layer (gap
+  +0.04..+0.18 growing with depth — opposite of CLINC gr2); greedy decays
+  monotonically 0.5375→0.0185, 43/49 negative steps; best pair [1,9] 0.5565.
+- **ModernBERT**: inverse — singles ≪ in-place for L≥2 (L2: 0.145 vs 0.457;
+  layers are input-distribution-dependent), in-place matches baseline
+  exactly (L1 0.5068/L22 0.4967); greedy max 0.5215 @ step 1 then gentle
+  decay to 0.4384; best pair [1,22].
+- **Qwen3 baseline**: L28 ridge 0.6536 / ln_plain 0.6403 / plain 0.6152 val
+  (~2× DeBERTa CLS baseline); oracle gain +0.17..+0.29.
+- Method note: fixed-512 padding systematically lowers modernBERT accs by
+  ~0.02-0.03 (deberta insensitive); runner switched to per-batch longest
+  padding (commit `9887739`), ModernBERT run redone with corrected
+  semantics.
 
 **Fragmented experiments gr2** (`user_exp_plans/fragmented_exp_gr2.md`) is **complete**
 (2026-08-13→14, commit `3cf29fb`+report commits): one data-collection
