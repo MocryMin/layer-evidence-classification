@@ -35,20 +35,42 @@ Date: 2026-08-18 · Group: `user_exp_plans/fragmented_exp_gr3.md` (step 1) · Re
 - Class-wise: R_max≥0.5 only **12/134**, ≥0.8 for 0 - far more concentrated-low than DeBERTa. Top: Kidney Health 0.78 (L1), Hereditary Angioedema 0.73 (L1), Skin Care 0.71 (L1).
 - Domains: biochemistry 0.580 > Civil 0.494 ≈ MAE 0.472 ≈ Psychology 0.467 > ECE 0.430 > CS 0.388 ≈ Medical 0.390.
 
-## 3. Cross-model
+## 3. Per-class layer spread & sorted-drop structure (addendum, `scripts/gr3_classwise_layer_std.py`)
+
+For each class: `std_c` = std of `R_{l,c}` across all layers; the sorted curve r_1≥…≥r_L of its per-layer recoverability and where the **largest consecutive drop** (r_k−r_{k+1}) sits. n_err≥10 filter throughout.
+
+**DeBERTa** — std mean **0.128** (median 0.133, max 0.257), corr(std, n_err) −0.17/−0.22.
+
+- Sorted-drop position histogram is bimodal: **k=1 for 29/133 classes** (one layer dominates, big gap to second) vs **k=11 for 65** (gradual decay, gap only to the single worst layer) — i.e. most classes do NOT have a sharp early cutoff; recoverability decays gradually and drops off at one specific bad layer.
+- Sharp early-drop classes (6, drop≥0.25 at k≤3): Electric motor (drop 0.27@k1, R_max 0.60@L1), Schizophrenia (0.31@k1, L1), Fungal Infection (0.27@k1, L1), Menopause (0.27@k1, L7), Osteoarthritis (0.29@k1, L2), Asthma (0.26@k2). 5/6 Medical/adjacent - these classes' recovery hinges on one early layer.
+- Flat classes (std≤0.05, 22): Structured Storage 0.000, Voltage law 0.000 (unrecoverable at every layer), Bioinformatics 0.018, Control engineering 0.016, Depression 0.048, Attention 0.048.
+- Domain spread: Civil 0.163 > Psychology 0.140 > MAE 0.131 > Medical 0.128 > CS 0.117 > biochemistry 0.114 > ECE 0.105.
+- Top-std: Atrial Fibrillation 0.256, Emergency Contraception 0.249, Hypothyroidism 0.242, False memories 0.241.
+
+**modernBERT** — std mean **0.066** (half of DeBERTa's), corr(std, n_err) **−0.38/−0.41**.
+
+- Same two regimes but tilted to top-concentration: **k=1 for 59/133** (L1 dominance, consistent with monotone R_l), k=21 for 27.
+- Sharp (3): Kidney Health (drop 0.48@k1, R_max 0.78@L1 — the strongest single-layer dependence of any class), Skin Care (0.29@k1), Atrial Fibrillation (0.27@k1).
+- Flat classes: 49 (std≤0.05) — a third of all classes have uniformly low recoverability across the whole stack.
+- Domain spread nearly uniform (0.055-0.070).
+
+**Comparison**: per-class recoverability is ~2× more layer-concentrated in DeBERTa (std 0.128 vs 0.066). corr(std_c) across models **+0.655** — *which classes* concentrate is shared, but corr of the top-gap (how sharply the best layer separates from the rest) is only +0.089 — *which layer* carries a class does not transfer.
+
+## 4. Cross-model
 
 - Per-class R_max correlation (n_err≥10): **+0.626** - substantially shared, partially complementary.
 - Largest flips toward modernBERT: **Kidney Health** (deb 0.000 -> mb 0.783), Senior Health (0 -> 0.13), Electrical generator (0.48 -> 0.58). Toward DeBERTa: Crohn's Disease (0.76 vs 0.18), Remote Sensing (0.71 vs 0.19), Overactive Bladder (0.82 vs 0.31), False memories (0.82 vs 0.33).
 - Mean mid-layer harm: DeBERTa 0.203 vs modernBERT 0.324 - modernBERT's mid layers break correct finals more while recovering less (outside L1).
 
-## 4. Artifacts
+## 5. Artifacts
 
-`artifacts/fragmented-experiments/class-wiseRecoverabilityWOS46985_260818_01/`: `analysis.json` (full R_lc/H_lc unsimplified fractions per EXP-001 convention, per-class n/n_err/n_rec, R_max, argmax, domains), `{deberta,modernbert}_classwise.csv`.
+`artifacts/fragmented-experiments/class-wiseRecoverabilityWOS46985_260818_01/`: `analysis.json` (full R_lc/H_lc unsimplified fractions per EXP-001 convention, per-class n/n_err/n_rec, R_max, argmax, domains), `{deberta,modernbert}_classwise.csv`, `layer_std_analysis.json` + `{deberta,modernbert}_layerstd.csv` (per-class std across layers, sorted-drop position/magnitude, top-gap).
 
-## 5. Observations
+## 6. Observations
 
 - _Data collection point - no hypothesis; observations are supported by the outputs above._
 - On WOS-46985 (134-class, acc ~0.30/0.49) the per-class error budget is large enough for stable class-wise fractions (mean ~49 errors/class DeBERTa, ~36 modernBERT) - the CLINC sparsity limitation does not apply.
 - The two backbones show qualitatively different recoverability geometry: DeBERTa has a mid-layer sweet spot (L5 best recoverer AND least harm, R_oracle 0.63 spread across the stack), modernBERT has a strict early-layer gradient (L1 dominates; deeper layers both recover less and harm more).
 - Recoverability is broad, not concentrated (D_JS 0.036/0.048), and is not explained by error mass (negative corr with n_err). Domain structure matters: Civil/biochemistry recover best on both backbones; Medical - the largest error mass - recovers worst on both.
 - Per-class complementarity across backbones (corr 0.63, hard flips like Kidney Health 0->0.78) suggests recoverability is partly a function of class, not only of backbone geometry.
+- Sorted-drop addendum: per-class recoverability curves fall into two regimes — top-layer-concentrated (sharp drop at k=1) vs gradual decay with a single worst-layer gap — and DeBERTa carries ~2× the layer-spread of modernBERT. Which classes concentrate is shared across backbones (corr 0.66); which layer carries them is not (top-gap corr 0.09).
