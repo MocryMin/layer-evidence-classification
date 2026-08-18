@@ -257,12 +257,12 @@ def stage_smoke(device):
     print(f"[smoke] chosen lr {best['lr']:g} (best val {best['best_val_acc']:.4f})")
 
 
-def stage_ft(device, variant):
+def stage_ft(device, variant, lr_override=None):
     model, tok = _init_model(device)
     freeze = freeze_variant(model, variant)
     ids, ys = _tokenised_splits(tok)
     pad_id = tok.pad_token_id
-    lr = json.load(open(ART / "smoke.json"))["chosen_lr"]
+    lr = lr_override or json.load(open(ART / "smoke.json"))["chosen_lr"]
 
     best = {"val_acc": -1.0, "state": None, "step": -1}
 
@@ -294,7 +294,8 @@ def stage_ft(device, variant):
     model.backbone.load_state_dict(bbd)
     model.backbone.save_pretrained(d)
     tok.save_pretrained(d)
-    json.dump({"variant": variant, "freeze": freeze, "lr": lr, "ft": FT,
+    json.dump({"variant": variant, "freeze": freeze, "lr": lr,
+               "lr_override": lr_override is not None, "ft": FT,
                "history": hist, "best_step": best["step"],
                "best_val_acc": best["val_acc"], "test_acc_at_best": test_acc},
               open(d / "ft_history.json", "w"), indent=1)
@@ -362,12 +363,18 @@ def main():
     ap.add_argument("--stage", required=True,
                     choices=["probe", "smoke", "ft", "analyze"])
     ap.add_argument("--variant", choices=["full", "attn"], default="full")
+    ap.add_argument("--lr", type=float, default=None,
+                    help="override smoke-chosen lr (e.g. after instability)")
     args = ap.parse_args()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     enable_determinism()
     ART.mkdir(parents=True, exist_ok=True)
-    dict(probe=stage_probe, smoke=stage_smoke, ft=stage_ft,
-         analyze=stage_analyze)[args.stage](device, **({} if args.stage in ("probe", "smoke") else {"variant": args.variant}))
+    if args.stage == "ft":
+        stage_ft(device, args.variant, args.lr)
+    elif args.stage == "analyze":
+        stage_analyze(device, args.variant)
+    else:
+        dict(probe=stage_probe, smoke=stage_smoke)[args.stage](device)
 
 
 if __name__ == "__main__":
