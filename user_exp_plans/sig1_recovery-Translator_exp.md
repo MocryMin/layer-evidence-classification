@@ -1,0 +1,4 @@
+We suspect whether the fail in fragmented_exp_sig1 is due to the geometry mismatch of different path hidden features. So, for top-10 paths, we each train a tiny translator in front canonical classification head. 
+The translator is in form of residual low rank:$T_P(h_P)=h_P+B_PA_Ph_P,$ where $A_P\in R^{r\times d}, B_P\in R^{d\times r}.$ 
+When r=4, this translator involves 768*8 trainable parameters, 4/75 compared with classification head. 
+For grid, we try r=2,4,8,16. To see whether a translator could pull the hidden state of good paths back to the form that canonical classification head could readout. 
