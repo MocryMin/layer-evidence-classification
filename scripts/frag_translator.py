@@ -367,6 +367,11 @@ def main():
                                              "both"], default="features",
                     help="regression target: features (260825), pair/canon "
                          "(260826 #3, logit-space)")
+    ap.add_argument("--reg-alpha", type=float, default=None,
+                    help="fixed alpha for all reg targets (default: per-path "
+                         "90/10 selection; the logit targets select alpha=1 "
+                         "everywhere - do-nothing - so 1e-6 is the meaningful "
+                         "probe for the canon target)")
     args = ap.parse_args()
     if args.name is None:
         args.name = ("canonical_translator_smoke_260825" if args.smoke
@@ -557,9 +562,12 @@ def main():
         k_ = key(p)
         for target in reg_targets:
             obj = "reg" if target == "features" else f"reg_{target}"
-            alpha, alpha_scores = select_reg_alpha(
-                feats["train"][k_], feats["train"][ck], W_c,
-                args.seed + 100 * pi, target)
+            if args.reg_alpha is None:
+                alpha, alpha_scores = select_reg_alpha(
+                    feats["train"][k_], feats["train"][ck], W_c,
+                    args.seed + 100 * pi, target)
+            else:
+                alpha, alpha_scores = args.reg_alpha, {"fixed": args.reg_alpha}
             entry: dict = {"alpha": alpha, "alpha_scores": alpha_scores}
             if target == "features":
                 W_full, _ = fit_reg_full(feats["train"][k_], feats["train"][ck], alpha)
