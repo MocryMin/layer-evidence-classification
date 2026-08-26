@@ -2,6 +2,34 @@
 
 ## Current state
 
+**EXP-004 design phase — ACTIVE (2026-08-26).** The main question is no longer
+generic path vocabulary construction.  It is whether a frozen canonical
+readout imposes an implicit compatibility/admissibility constraint on
+alternative layer-path search.  The current design target is:
+
+- H1: task-wise existence + prevalence of paths with a strong path-specific
+  low-parameter diagnostic head but weak canonical/native readout;
+- H2: sample-wise existence of shorter-correct or error-recovering paths under
+  the frozen canonical head, using a prior-work-style MCTS protocol plus a
+  matched random-search control;
+- ACO is deferred to a later matched search-algorithm comparison; routing
+  vocabulary / 2-gram minimisation is deferred to EXP-005.
+
+The immediate work is prior-related review and a complete EXP-004 protocol
+document before experiments begin.  The host-side EXP-004 draft still reflects
+an older ACO-heavy design and is not yet the execution specification.
+
+**Translator-bias audit correction (2026-08-26).** The original bias-on
+evaluation counted `b_T @ W_c` twice and incorrectly described its
+class-specific logit shift as argmax-invariant.  `scripts/frag_translator.py`
+is corrected and covered by three algebraic regression tests (full suite
+55/55).  A deterministic correction run preserves all 541 translator arrays
+bit-exactly and changes only evaluation: mean CE accuracy over the top-10 paths
+is r2/r4/r8/r16/r32/r64/r128/full =
+0.0273/0.0788/0.2281/0.4195/0.6170/0.7160/0.7437/0.7900.  Report:
+`agent-BuildReports/fragmented-experiments/translator_bias_evalfix_260826_01.md`;
+artifact: `artifacts/fragmented-experiments/translator_bias_evalfix_260826_01/`.
+
 **gr2 tasks 1-3 × WOS-46985 runs — COMPLETE** (runner
 `scripts/frag_modular_probe_wos.py`; reports:
 `agent-BuildReports/fragmented-experiments/{DeBERTaV3BaseWOS46985LayerProbe_260814_01,
@@ -228,19 +256,26 @@ trie DFS with branch-stack fp16 cache, resumable JSONL, wall-clock deadline).
 
 ## Active blockers
 
-None. EXP-003 is complete; $H_{1-2}$ are accepted (very strong). EXP-001's
-plain-probe protocol is superseded - no further plain-probe runs needed.
+- EXP-004's updated hypothesis, split discipline, path pool, thresholds and
+  MCTS controls are still being finalised; do not start an official EXP-004
+  run from the older host draft.
+- Recent fragmented work remains local-only until the Git/report correction
+  commits and a new artifact freeze are synchronised.
+- EXP-003 is complete; its historical manual log is not on the critical path
+  for EXP-004 and is not being reopened during the current deadline.
 
 ## Next action
 
-gr2 data collection complete (await user direction). Per the EXP-001 plan §3:
-- Scale to `modernBERT-base` and `modernBERT-large` as future major targets.
-- Consider non-CLS readouts (mean-pooling) - EXP-002 task 06 showed non-CLS
-  tokens do not collapse at mid layers.
-- `Qwen3-Embedding-0.6B` side verification (pending since EXP-001).
-- gr2 follow-ups if the user wants them: same modular probe on modernBERT-base
-  or WOS-46985; repeat-free path sampling; per-layer-composition diagnostics
-  of why stacks decay past depth 2.
+1. Complete the EXP-004 prior map, especially the exact readout/training/search
+   protocol in Logit Lens, Tuned Lens, Jump to Conclusions, LayerSkip, CoLa,
+   PoLar, Dr.LLM, MACRO and the looped-transformer trajectory/readout work.
+2. Freeze H1/H2 definitions, discovery/confirmation splits, path sampling,
+   canonical and path-specific heads, MCTS budget, random control, metrics and
+   acceptance criteria in the new EXP-004 plan before implementation.
+3. Commit and synchronise the translator evaluation correction and recent
+   local Git history; create a checksummed private freeze for recent artifacts.
+4. Keep historical EXP-003 statistical/log amendments as a separate
+   non-blocking addendum; do not divert the EXP-004 deadline to rewriting it.
 
 ## Important paths
 

@@ -1,5 +1,24 @@
 # translator_bias_260826_01 — append exp: ΔW SVD analysis + bias + logit-space regression targets (DeBERTa-v3-base × CLINC150)
 
+> **Audit correction — 2026-08-26.** The CE-with-bias train/validation
+> evaluation in this report is withdrawn pending corrected re-evaluation.
+> `apply_T` added `b_T` to the features and the evaluation then also used
+> `b_c + b_T^T W_c`, so `b_T^T W_c` was counted twice at evaluation although
+> it was counted once during training. In addition, `b_T^T W_c` is a
+> sample-independent but generally **class-specific** logit-bias vector, not a
+> common scalar shift; it can therefore change argmax. The claims that bias
+> "cannot help by construction", refutes the frozen-bias hypothesis, or
+> empirically hurts are not supported by the recorded evaluation. The
+> bias-free 2026-08-25 run and the SVD/regression results are not affected by
+> this specific evaluation bug. Original artifacts are retained unchanged; a
+> separately named corrected run/addendum replaces only the withdrawn
+> CE-with-bias results: `translator_bias_evalfix_260826_01.md`.
+>
+> **Provenance correction.** Run metadata records `d390828` (dirty=True) for
+> `translator_bias_260826_01` and `9659ad1` (dirty=True) for
+> `translator_bias_260826_02`; the original header's `eaa1063` and
+> `dirty=False` are not the run-time provenance.
+
 Date: 2026-08-26 (two runs: `translator_bias_260826_01` α-selected, `translator_bias_260826_02` α=1e-6; ≈15 min each wall) · Plan: `user_exp_plans/sig1_recovery-Translator_exp.md` append 260826 · Git: `d390828` + `eaa1063` (dirty=False) · Seed 17
 
 ## Question

@@ -213,6 +213,18 @@ def eff_bias(state: dict, W_c: torch.Tensor, b_c: torch.Tensor,
     return b_c + state["b"].double() @ W_c
 
 
+def translated_logits(state: dict, x: torch.Tensor, W_c: torch.Tensor,
+                      b_c: torch.Tensor, full_rank: bool) -> torch.Tensor:
+    """Evaluate ``T(x) @ W_c + b_c`` with translator bias exactly once.
+
+    ``apply_T`` already adds ``b_T`` to the transformed features.  The
+    algebraically equivalent effective-head form would instead apply the
+    *bias-free* transform and use ``b_c + b_T @ W_c``.  Mixing those two
+    forms double-counts ``b_T @ W_c``.
+    """
+    return apply_T(state, x, full_rank) @ W_c + b_c
+
+
 def delta_head(state: dict, W_c: torch.Tensor, full_rank: bool) -> torch.Tensor:
     """Effective head correction A^T B^T W_c (rank <= r) / M W_c."""
     if full_rank:
@@ -527,10 +539,14 @@ def main():
             t_va = apply_T(state, feats["val"][k_], full)
             t_tr = apply_T(state, feats["train"][k_], full)
             dw = delta_head(state, W_c, full)
+            # Keep b_eff for the effective-head diagnostics below.  Accuracy
+            # uses the feature-space form T(x) @ W_c + b_c; apply_T already
+            # includes b_T, so passing b_eff to score_head would count the
+            # translator bias twice.
             b_eff = eff_bias(state, W_c, b_c, full)
             meta.update({
-                "val_acc": score_head(t_va, W_c, b_eff, y_va),
-                "train_acc": score_head(t_tr, W_c, b_eff, y_tr),
+                "val_acc": score_head(t_va, W_c, b_c, y_va),
+                "train_acc": score_head(t_tr, W_c, b_c, y_tr),
                 "prox_after": proximity(t_va, feats["val"][k_], feats["val"][ck]),
                 "params": ((768 * 768 + 768) if full else 2 * 768 * r + 768)
                           if args.bias else ((768 * 768) if full else 2 * 768 * r),
@@ -771,8 +787,8 @@ def main():
                           + str(rs) + " + full-rank reference",
             "effective_head": "W_eff = W_c + A^T (B^T W_c), rank(W_eff - W_c) "
                               "<= r; effective bias b_c + b_T^T W_c (fully "
-                              "learnable when bias on; argmax-irrelevant - "
-                              "a constant logit shift)",
+                              "learnable when bias on; a sample-independent "
+                              "but class-specific shift that can change argmax)",
             "param_counts": {**{f"r{r}": (2 * 768 * r + (768 if args.bias else 0))
                                 for r in rs},
                              "full": 768 * 768 + (768 if args.bias else 0),
