@@ -1,0 +1,20 @@
+experiment_id: EXP-20260827-004-h1-head-qualification-v2
+status: engineering_qualification_not_hypothesis_evidence
+source_run: artifacts/EXP-20260827-004-h1-qualification
+source_config_hash: dfc63de9f3397ecb98258c6e49421842ffed1635d76e71e7d0d33684a52b77d7
+selection_data: D_fit_internal_cross_validation_only
+n_folds: 5
+seed: 17
+# Repeats the full original grid and extends its boundary optimum above 0.1.
+l2_grid: [0.0, 0.00000001, 0.0000001, 0.000001, 0.00001, 0.0001, 0.001, 0.01, 0.1, 0.3, 1.0, 3.0, 10.0]
+solver:
+  name: full_batch_lbfgs
+  max_iter: 100
+  tolerance_grad: 0.0000001
+  bias: false
+  n_classes: 5
+runtime:
+  reserve_minutes: 15
+  artifact_root: artifacts/EXP-20260827-004-h1-head-qualification-v2
+  allow_validation: false
+  allow_test: false
