@@ -2,6 +2,23 @@
 
 ## Current state
 
+**EXP-004 H1 engineering qualification + structured pilot — COMPLETE
+(2026-08-27; non-confirmatory).** A new Llama-3.2-3B-Instruct × ARC-Easy
+runner now supports arbitrary repeatable decoder paths, valid-choice masking,
+required timezone-aware stop times, atomic 64-sample shards, signal-safe stop
+and resume. Modular canonical features/logits are bit-exact to native forward;
+the full 1750/501 official-train qualification uses about 6.13 GiB peak CUDA.
+`D_fit`-only 5-fold CV selected task-head L2=0.3 (CV 0.8949±0.0156; refit
+discover 0.9182 vs native canonical 0.9042). A fixed 84-path near-canonical
+pilot found 57 good paths and one audited provisional collapse:
+`[1,...,28,28]` task=0.9182 but native=0.2675 (chance=0.2500; absolute gap
+0.6367). Raw forward and refit reproduce bit-exact at the original batch size.
+This is **not official H1 evidence**: prompt/search protocol was provisional,
+only one source supplied a witness, and validation/test were not accessed.
+Report: `agent-BuildReports/experiments/EXP-20260827-004-h1-structured-pilot.md`;
+artifacts: `artifacts/EXP-20260827-004-h1-{qualification,
+head-qualification-v2,structured-pilot}/`.
+
 **EXP-004 design phase — ACTIVE (2026-08-26).** The main question is no longer
 generic path vocabulary construction.  It is whether a frozen canonical
 readout imposes an implicit compatibility/admissibility constraint on
@@ -256,9 +273,10 @@ trie DFS with branch-stack fp16 cache, resumable JSONL, wall-clock deadline).
 
 ## Active blockers
 
-- EXP-004's updated hypothesis, split discipline, path pool, thresholds and
-  MCTS controls are still being finalised; do not start an official EXP-004
-  run from the older host draft.
+- EXP-004's official prompt, exact multi-source generator/temperature/max path
+  length, validation-confirmation wording and H2 controls are still being
+  finalised. The infrastructure and non-confirmatory H1 pilot are valid, but do
+  not start an official EXP-004 run from the provisional configs.
 - Recent fragmented work remains local-only until the Git/report correction
   commits and a new artifact freeze are synchronised.
 - EXP-003 is complete; its historical manual log is not on the critical path
@@ -266,15 +284,16 @@ trie DFS with branch-stack fp16 cache, resumable JSONL, wall-clock deadline).
 
 ## Next action
 
-1. Complete the EXP-004 prior map, especially the exact readout/training/search
-   protocol in Logit Lens, Tuned Lens, Jump to Conclusions, LayerSkip, CoLa,
-   PoLar, Dr.LLM, MACRO and the looped-transformer trajectory/readout work.
-2. Freeze H1/H2 definitions, discovery/confirmation splits, path sampling,
-   canonical and path-specific heads, MCTS budget, random control, metrics and
-   acceptance criteria in the new EXP-004 plan before implementation.
-3. Commit and synchronise the translator evaluation correction and recent
+1. Complete the EXP-004 prior map and freeze the official H1/H2 protocol.
+2. Incorporate the qualified implementation facts (A--E mask, final-RMSNorm
+   shared input, D_fit-only head CV, L2=0.3 candidate, required stop-at) without
+   treating the structured-pilot witness as confirmatory evidence.
+3. After protocol freeze, create a new official run ID/config and run H1
+   discovery in explicitly timed resumable segments; validation/test remain
+   locked until the candidate set and all thresholds are frozen.
+4. Commit and synchronise the translator evaluation correction and recent
    local Git history; create a checksummed private freeze for recent artifacts.
-4. Keep historical EXP-003 statistical/log amendments as a separate
+5. Keep historical EXP-003 statistical/log amendments as a separate
    non-blocking addendum; do not divert the EXP-004 deadline to rewriting it.
 
 ## Important paths
