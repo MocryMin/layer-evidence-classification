@@ -21,6 +21,7 @@ from src.exp004_h1 import (  # noqa: E402
     format_arc_prompt,
     make_fit_discover_indices,
     masked_accuracy,
+    stratified_fold_ids,
     valid_choice_mask,
 )
 
@@ -61,6 +62,15 @@ class TestArcProtocol(unittest.TestCase):
 
     def test_chance_uses_per_item_choice_count(self):
         self.assertAlmostEqual(chance_accuracy([3, 4, 5]), (1 / 3 + 1 / 4 + 1 / 5) / 3)
+
+    def test_stratified_folds_are_deterministic_and_complete(self):
+        labels = [0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3]
+        counts = [4] * len(labels)
+        first = stratified_fold_ids(labels, counts, 3, 17)
+        second = stratified_fold_ids(labels, counts, 3, 17)
+        self.assertEqual(first, second)
+        self.assertEqual(set(first), {0, 1, 2})
+        self.assertEqual([first.count(fold) for fold in range(3)], [4, 4, 4])
 
 
 class TestAtomicArtifactsAndDeadline(unittest.TestCase):

@@ -421,3 +421,30 @@ def fit_masked_linear_head(
         "closure_calls": calls,
         "elapsed_seconds": elapsed,
     }
+
+
+def stratified_fold_ids(
+    labels: Sequence[int], choice_counts: Sequence[int], n_folds: int, seed: int
+) -> list[int]:
+    """Assign deterministic folds within (choice-count, answer-position) strata."""
+    if len(labels) != len(choice_counts):
+        raise ValueError("labels and choice_counts must have equal length")
+    if n_folds < 2 or n_folds > len(labels):
+        raise ValueError("invalid number of folds")
+    strata: dict[tuple[int, int], list[int]] = {}
+    for index, (label, count) in enumerate(zip(labels, choice_counts)):
+        if not 0 <= int(label) < int(count):
+            raise ValueError("label is outside its valid choices")
+        strata.setdefault((int(count), int(label)), []).append(index)
+    rng = random.Random(seed)
+    folds = [-1] * len(labels)
+    offset = 0
+    for key in sorted(strata):
+        indices = strata[key]
+        rng.shuffle(indices)
+        for local_position, index in enumerate(indices):
+            folds[index] = (offset + local_position) % n_folds
+        offset = (offset + len(indices)) % n_folds
+    if any(item < 0 for item in folds):
+        raise AssertionError("incomplete fold assignment")
+    return folds
