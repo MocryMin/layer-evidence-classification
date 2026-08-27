@@ -513,7 +513,13 @@ def run() -> int:
         if model is not None:
             del model
         if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+            # A poisoned CUDA context can make cleanup itself raise and obscure
+            # the already-persisted root failure.  A fresh process owns the
+            # recovery; cleanup is best-effort only.
+            try:
+                torch.cuda.empty_cache()
+            except Exception:
+                pass
 
 
 if __name__ == "__main__":
