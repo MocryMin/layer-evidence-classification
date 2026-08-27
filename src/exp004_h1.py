@@ -316,6 +316,201 @@ class ModularLlamaExecutor:
         return terminal, self.label_logits(terminal)
 
 
+def token_ids(value: Any) -> list[int]:
+    """Normalise tokenizer/BatchEncoding outputs to one flat ID list."""
+    if hasattr(value, "input_ids"):
+        ids = value.input_ids
+    elif isinstance(value, dict):
+        ids = value["input_ids"]
+    else:
+        ids = value
+    if hasattr(ids, "tolist"):
+        ids = ids.tolist()
+    if ids and isinstance(ids[0], list):
+        ids = ids[0]
+    return [int(item) for item in ids]
+
+
+def verify_answer_tokens(tokenizer: Any, config: dict[str, Any]) -> list[int]:
+    """Verify the exact A--E token immediately after the assistant header."""
+    example_text = "Question: 1+1?\nA. 1\nB. 2\n\nAnswer:"
+    messages = [{"role": "user", "content": example_text}]
+    base = token_ids(
+        tokenizer.apply_chat_template(
+            messages, tokenize=True, add_generation_prompt=True, return_dict=True
+        )
+    )
+    observed: list[int] = []
+    for label in config["tokenization"]["answer_labels"]:
+        full = token_ids(
+            tokenizer.apply_chat_template(
+                messages + [{"role": "assistant", "content": label}],
+                tokenize=True,
+                add_generation_prompt=False,
+                return_dict=True,
+            )
+        )
+        if full[: len(base)] != base or len(full) <= len(base):
+            raise RuntimeError(f"chat-template boundary is not prefix-stable for {label}")
+        observed.append(full[len(base)])
+    expected = [int(item) for item in config["tokenization"]["expected_answer_token_ids"]]
+    if observed != expected:
+        raise RuntimeError(f"answer-token mismatch: observed={observed}, expected={expected}")
+    return observed
+
+
+def encode_arc_examples(
+    tokenizer: Any, examples: Sequence[ArcExample], prompt_cfg: dict[str, Any]
+) -> dict[str, torch.Tensor]:
+    """Apply the frozen chat template and dynamically right-pad one batch."""
+    encoded = []
+    for example in examples:
+        prompt = format_arc_prompt(example, prompt_cfg)
+        messages = [{"role": "user", "content": prompt}]
+        ids = token_ids(
+            tokenizer.apply_chat_template(
+                messages, tokenize=True, add_generation_prompt=True, return_dict=True
+            )
+        )
+        encoded.append({"input_ids": ids, "attention_mask": [1] * len(ids)})
+    return tokenizer.pad(encoded, padding=True, return_tensors="pt")
+
+
+def extract_path_feature_split(
+    split_name: str,
+    examples: Sequence[ArcExample],
+    original_indices: Sequence[int],
+    *,
+    executor: ModularLlamaExecutor,
+    tokenizer: Any,
+    prompt_cfg: dict[str, Any],
+    max_length_guard: int,
+    path: Sequence[int],
+    path_id: str,
+    batch_size: int,
+    shard_size: int,
+    config_hash: str,
+    feature_root: Path,
+    deadline: DeadlineController,
+    journal: EventJournal,
+) -> dict[str, Any]:
+    """Extract one path/split in crash-safe shards, reusing completed shards."""
+    split_root = feature_root / path_id / split_name
+    split_root.mkdir(parents=True, exist_ok=True)
+    device = next(executor.causal_lm.parameters()).device
+    batch_durations: list[float] = []
+    n_reused = 0
+    for shard_start in range(0, len(examples), shard_size):
+        next_estimate = max(batch_durations[-5:] or [60.0])
+        deadline.checkpoint(next_unit_seconds=next_estimate)
+        shard_end = min(shard_start + shard_size, len(examples))
+        shard_path = split_root / f"shard_{shard_start:05d}_{shard_end:05d}.pt"
+        expected_indices = list(original_indices[shard_start:shard_end])
+        if shard_path.exists():
+            saved = torch.load(shard_path, map_location="cpu", weights_only=False)
+            if (
+                saved["config_hash"] != config_hash
+                or saved["original_indices"] != expected_indices
+                or saved["path"] != list(path)
+            ):
+                raise RuntimeError(f"resume validation failed for {shard_path}")
+            n_reused += shard_end - shard_start
+            continue
+
+        shard_examples = examples[shard_start:shard_end]
+        features: list[torch.Tensor] = []
+        logits: list[torch.Tensor] = []
+        shard_batch_durations: list[float] = []
+        journal.append(
+            "path_shard_started",
+            path_id=path_id,
+            split=split_name,
+            start=shard_start,
+            end=shard_end,
+        )
+        shard_t0 = time.monotonic()
+        for batch_start in range(0, len(shard_examples), batch_size):
+            next_estimate = max(batch_durations[-5:] or [60.0])
+            deadline.checkpoint(next_unit_seconds=next_estimate)
+            batch_examples = shard_examples[batch_start : batch_start + batch_size]
+            encoded = encode_arc_examples(tokenizer, batch_examples, prompt_cfg)
+            if encoded["input_ids"].shape[1] > max_length_guard:
+                raise RuntimeError(
+                    f"token length {encoded['input_ids'].shape[1]} exceeds max_length_guard"
+                )
+            input_ids = encoded["input_ids"].to(device, non_blocking=True)
+            attention_mask = encoded["attention_mask"].to(device, non_blocking=True)
+            batch_t0 = time.monotonic()
+            terminal, label_logits = executor.forward_path(input_ids, attention_mask, path)
+            if device.type == "cuda":
+                torch.cuda.synchronize(device)
+            duration = time.monotonic() - batch_t0
+            batch_durations.append(duration)
+            shard_batch_durations.append(duration)
+            features.append(terminal.to(dtype=torch.float16, device="cpu"))
+            logits.append(label_logits.float().cpu())
+
+        payload = {
+            "config_hash": config_hash,
+            "path_id": path_id,
+            "path": list(path),
+            "split": split_name,
+            "start": shard_start,
+            "end": shard_end,
+            "original_indices": expected_indices,
+            "sample_ids": [item.sample_id for item in shard_examples],
+            "labels": torch.tensor(
+                [item.answer_position for item in shard_examples], dtype=torch.long
+            ),
+            "choice_counts": torch.tensor(
+                [item.n_choices for item in shard_examples], dtype=torch.int8
+            ),
+            "features": torch.cat(features, dim=0),
+            "native_label_logits": torch.cat(logits, dim=0),
+            "elapsed_seconds": time.monotonic() - shard_t0,
+            "batch_durations_seconds": shard_batch_durations,
+        }
+        atomic_torch_save(shard_path, payload)
+        journal.append(
+            "path_shard_completed",
+            path_id=path_id,
+            split=split_name,
+            start=shard_start,
+            end=shard_end,
+            elapsed_seconds=payload["elapsed_seconds"],
+        )
+    return {
+        "path_id": path_id,
+        "split": split_name,
+        "n_samples": len(examples),
+        "n_reused": n_reused,
+        "batch_durations_seconds": batch_durations,
+    }
+
+
+def load_path_feature_split(
+    feature_root: Path, path_id: str, split_name: str
+) -> dict[str, Any]:
+    paths = sorted((feature_root / path_id / split_name).glob("shard_*.pt"))
+    if not paths:
+        raise RuntimeError(f"no completed shards for {path_id}/{split_name}")
+    shards = [torch.load(path, map_location="cpu", weights_only=False) for path in paths]
+    expected = 0
+    for shard in shards:
+        if shard["start"] != expected:
+            raise RuntimeError(
+                f"non-contiguous shards for {path_id}/{split_name}: expected {expected}"
+            )
+        expected = shard["end"]
+    return {
+        "features": torch.cat([item["features"] for item in shards]),
+        "native_label_logits": torch.cat([item["native_label_logits"] for item in shards]),
+        "labels": torch.cat([item["labels"] for item in shards]),
+        "choice_counts": torch.cat([item["choice_counts"] for item in shards]).long(),
+        "sample_ids": sum((item["sample_ids"] for item in shards), []),
+    }
+
+
 def git_state() -> dict[str, Any]:
     """Return current commit and dirty state without modifying Git config."""
     try:

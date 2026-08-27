@@ -24,6 +24,7 @@ from src.exp004_h1 import (  # noqa: E402
     stratified_fold_ids,
     valid_choice_mask,
 )
+from scripts.exp004_h1_structured_pilot import structured_path_pool  # noqa: E402
 
 
 class TestArcProtocol(unittest.TestCase):
@@ -95,6 +96,17 @@ class TestAtomicArtifactsAndDeadline(unittest.TestCase):
             (deadline.hard_stop - deadline.soft_stop).total_seconds(), 600, delta=0.1
         )
         self.assertGreater(deadline.seconds_to_soft_stop(), 0)
+
+
+class TestStructuredPilotPool(unittest.TestCase):
+    def test_pool_has_expected_transparent_controls(self):
+        pool = structured_path_pool(list(range(1, 29)))
+        self.assertEqual(len(pool), 84)
+        self.assertEqual(len({item["path_id"] for item in pool}), 84)
+        by_id = {item["path_id"]: item for item in pool}
+        self.assertEqual(by_id["skip_L01"]["path"], list(range(2, 29)))
+        self.assertEqual(by_id["repeat_L28"]["path"][-2:], [28, 28])
+        self.assertEqual(by_id["swap_L01_L02"]["path"][:3], [2, 1, 3])
 
 
 if __name__ == "__main__":

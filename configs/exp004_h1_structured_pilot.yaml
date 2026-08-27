@@ -1,0 +1,32 @@
+experiment_id: EXP-20260827-004-h1-structured-pilot
+status: engineering_pilot_not_hypothesis_evidence
+source_qualification:
+  path: artifacts/EXP-20260827-004-h1-qualification
+  config_hash: dfc63de9f3397ecb98258c6e49421842ffed1635d76e71e7d0d33684a52b77d7
+head_qualification:
+  path: artifacts/EXP-20260827-004-h1-head-qualification-v2
+  config_hash: 435f712a691e28f5d72a49f9666949de3dd3bf4f47efd84c8e07f0e109c32640
+  selected_l2: 0.3
+path_pool:
+  include_canonical: true
+  generators: [single_skip, single_repeat, adjacent_swap]
+  expected_total_paths: 84
+criteria:
+  epsilon_task: 0.05
+  gap_absolute: 0.15
+  gap_relative: 0.5
+head:
+  solver: full_batch_lbfgs
+  max_iter: 100
+  tolerance_grad: 0.0000001
+  bias: false
+  n_classes: 5
+runtime:
+  batch_size: 8
+  shard_size: 64
+  reserve_minutes: 15
+  seed: 17
+  deterministic: true
+  artifact_root: artifacts/EXP-20260827-004-h1-structured-pilot
+  allow_validation: false
+  allow_test: false
