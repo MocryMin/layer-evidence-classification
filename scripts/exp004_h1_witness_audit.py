@@ -41,6 +41,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--path-id", default="repeat_L28")
     parser.add_argument("--recompute-samples", type=int, default=16)
+    parser.add_argument("--output-name", default=None)
     parser.add_argument("--stop-at", required=True)
     return parser.parse_args()
 
@@ -103,7 +104,8 @@ def run() -> int:
         weights_only=False,
     )["weight"].float()
 
-    audit_path = pilot_root / "audits" / f"{args.path_id}.json"
+    audit_name = args.output_name or args.path_id
+    audit_path = pilot_root / "audits" / f"{audit_name}.json"
     if audit_path.exists():
         raise RuntimeError(f"audit already exists: {audit_path}")
     deadline.checkpoint(next_unit_seconds=180.0)
@@ -135,12 +137,24 @@ def run() -> int:
         first_shard = torch.load(first_shard_path, map_location="cpu", weights_only=False)
         n = min(args.recompute_samples, len(first_shard["original_indices"]))
         examples = [all_train[index] for index in first_shard["original_indices"][:n]]
-        encoded = encode_arc_examples(tokenizer, examples, source_config["prompt"])
-        recomputed_features, recomputed_logits = executor.forward_path(
-            encoded["input_ids"].to("cuda"),
-            encoded["attention_mask"].to("cuda"),
-            result["path"],
-        )
+        recomputed_feature_parts = []
+        recomputed_logit_parts = []
+        recompute_batch_size = int(config["runtime"]["batch_size"])
+        for start in range(0, len(examples), recompute_batch_size):
+            encoded = encode_arc_examples(
+                tokenizer,
+                examples[start : start + recompute_batch_size],
+                source_config["prompt"],
+            )
+            part_features, part_logits = executor.forward_path(
+                encoded["input_ids"].to("cuda"),
+                encoded["attention_mask"].to("cuda"),
+                result["path"],
+            )
+            recomputed_feature_parts.append(part_features.cpu())
+            recomputed_logit_parts.append(part_logits.cpu())
+        recomputed_features = torch.cat(recomputed_feature_parts)
+        recomputed_logits = torch.cat(recomputed_logit_parts)
         saved_subset_features = first_shard["features"][:n]
         saved_subset_logits = first_shard["native_label_logits"][:n]
         feature_diff = (
@@ -211,6 +225,7 @@ def run() -> int:
             "completed_at": datetime.now().astimezone().isoformat(timespec="seconds"),
             "raw_recompute": {
                 "n_samples": n,
+                "batch_size": recompute_batch_size,
                 "feature_bit_equal_after_float16_storage": bool(
                     torch.equal(
                         recomputed_features.to(dtype=torch.float16, device="cpu"),
