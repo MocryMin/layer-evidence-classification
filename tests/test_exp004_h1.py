@@ -25,6 +25,12 @@ from src.exp004_h1 import (  # noqa: E402
     valid_choice_mask,
 )
 from scripts.exp004_h1_structured_pilot import structured_path_pool  # noqa: E402
+from src.exp004_h1_search import (  # noqa: E402
+    SOURCE_ORDER,
+    parent_probabilities,
+    path_key,
+    propose_candidate,
+)
 
 
 class TestArcProtocol(unittest.TestCase):
@@ -107,6 +113,56 @@ class TestStructuredPilotPool(unittest.TestCase):
         self.assertEqual(by_id["skip_L01"]["path"], list(range(2, 29)))
         self.assertEqual(by_id["repeat_L28"]["path"][-2:], [28, 28])
         self.assertEqual(by_id["swap_L01_L02"]["path"][:3], [2, 1, 3])
+
+
+class TestFrozenDiscoveryPolicy(unittest.TestCase):
+    def setUp(self):
+        canonical = list(range(1, 29))
+        canonical_entry = {
+            "path_id": "canonical",
+            "path": canonical,
+            "task_accuracy_discover": 0.9,
+        }
+        self.populations = {source: [] for source in SOURCE_ORDER}
+        self.populations["S1"] = [canonical_entry]
+        self.populations["S2"] = [canonical_entry]
+
+    def proposal(self, source, known=None):
+        import numpy as np
+
+        return propose_candidate(
+            source,
+            self.populations,
+            set() if known is None else known,
+            np.random.default_rng(17),
+            max_path_length=36,
+            temperature=0.05,
+            softmax_weight=0.75,
+            max_attempts=100,
+        )
+
+    def test_parent_mixture_is_positive_and_normalized(self):
+        entries = [
+            {"task_accuracy_discover": 0.9},
+            {"task_accuracy_discover": 0.1},
+        ]
+        probabilities = parent_probabilities(entries, temperature=0.05, softmax_weight=0.75)
+        self.assertAlmostEqual(float(probabilities.sum()), 1.0)
+        self.assertTrue(all(probabilities > 0))
+
+    def test_source_shapes_match_frozen_generators(self):
+        s1 = self.proposal("S1")
+        self.assertEqual(len(s1["path"]), 29)
+        self.assertEqual(s1["path"][-1], 28)
+        s2 = self.proposal("S2")
+        self.assertNotEqual(s2["path"], list(range(1, 29)))
+        s3 = self.proposal("S3", {path_key([1]), path_key([28])})
+        self.assertEqual(len(s3["path"]), 1)
+
+    def test_duplicate_retry_is_deterministic(self):
+        first = self.proposal("S1")
+        second = self.proposal("S1")
+        self.assertEqual(first, second)
 
 
 if __name__ == "__main__":

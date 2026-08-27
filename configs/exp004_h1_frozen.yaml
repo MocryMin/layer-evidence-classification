@@ -1,0 +1,53 @@
+experiment_id: EXP-20260827-004-h1-discovery
+status: frozen_official_train_discovery
+protocol_document:
+  path: 'C:\研究生\实习\learn AI\ReadLLMPaper\ExperimentLogs\RESEARCH-001_layer-evidence-classification\EXP-20260821-004--Fixed Readout Head Imposes an Implicit Admissibility Constraint on Path Searching.md'
+  wsl_path: '/mnt/c/研究生/实习/learn AI/ReadLLMPaper/ExperimentLogs/RESEARCH-001_layer-evidence-classification/EXP-20260821-004--Fixed Readout Head Imposes an Implicit Admissibility Constraint on Path Searching.md'
+  sha256: 2c09f58ff4fc30ed2223d070e50fb44325202ce75fcbbf7231ad6609e113d314
+source_qualification:
+  path: artifacts/EXP-20260827-004-h1-qualification
+  config_hash: dfc63de9f3397ecb98258c6e49421842ffed1635d76e71e7d0d33684a52b77d7
+head_qualification:
+  path: artifacts/EXP-20260827-004-h1-head-qualification-v2
+  config_hash: 435f712a691e28f5d72a49f9666949de3dd3bf4f47efd84c8e07f0e109c32640
+  selected_l2: 0.3
+split:
+  source: official_train_only
+  fit_size: 1750
+  discover_size: 501
+  seed: 17
+  indices_sha256: c5e33a578398304fe200386c0605e8b46e6a300394f91c5b4c7e32e40d52534f
+criteria:
+  epsilon_task: 0.05
+  gap_absolute: 0.15
+  gap_relative: 0.5
+  descriptive_prevalence_reference: 0.10
+head:
+  solver: full_batch_lbfgs
+  max_iter: 100
+  tolerance_grad: 0.0000001
+  bias: false
+  n_classes: 5
+search:
+  seed: 17
+  source_order: [S1, S2, S3, S4, S5]
+  max_path_length: 36
+  parent_softmax_weight: 0.75
+  parent_uniform_weight: 0.25
+  temperature: 0.05
+  proposal_attempts: 100
+  candidate_cap: 5000
+  controls_excluded_from_prevalence: [canonical, repeat_L28]
+campaign:
+  cumulative_model_resident_gpu_hours: 12.0
+  artifact_cap_gib: 200
+  no_metric_early_stop: true
+runtime:
+  batch_size: 8
+  shard_size: 64
+  reserve_minutes: 15
+  seed: 17
+  deterministic: true
+  artifact_root: artifacts/EXP-20260827-004-h1-discovery
+  allow_validation: false
+  allow_test: false
