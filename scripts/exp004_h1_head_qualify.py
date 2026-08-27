@@ -37,6 +37,7 @@ def parse_args() -> argparse.Namespace:
         "--config", default="configs/exp004_h1_head_qualification.yaml"
     )
     parser.add_argument("--stop-at", required=True)
+    parser.add_argument("--resume", action="store_true")
     return parser.parse_args()
 
 
@@ -78,25 +79,48 @@ def run() -> int:
         raise RuntimeError("source qualification config hash changed")
 
     output_root = resolved(config["runtime"]["artifact_root"]).resolve()
+    manifest_path = output_root / "run_manifest.json"
     if output_root.exists():
-        raise RuntimeError(f"head qualification output already exists: {output_root}")
-    output_root.mkdir(parents=True)
-    manifest = {
-        "experiment_id": config["experiment_id"],
-        "status": config["status"],
-        "config_hash": config_hash,
-        "source_run": str(source_run),
-        "source_run_config_hash": source_manifest["config_hash"],
-        "selection_data": config["selection_data"],
-        "git": git_state(),
-        "environment": environment_summary(),
-        "started_at": datetime.now().astimezone().isoformat(timespec="seconds"),
-        "hard_stop": deadline.hard_stop.isoformat(),
-        "soft_stop": deadline.soft_stop.isoformat(),
-        "official_hypothesis_evidence": False,
-        "validation_accessed": False,
-        "test_accessed": False,
-    }
+        if not args.resume:
+            raise RuntimeError(
+                f"head qualification output already exists; pass --resume: {output_root}"
+            )
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        if manifest["config_hash"] != config_hash:
+            raise RuntimeError("refusing resume: head qualification config changed")
+        if manifest["source_run_config_hash"] != source_manifest["config_hash"]:
+            raise RuntimeError("refusing resume: source qualification changed")
+        manifest.setdefault("resume_history", []).append(
+            {
+                "time": datetime.now().astimezone().isoformat(timespec="seconds"),
+                "git": git_state(),
+                "previous_status": manifest.get("status"),
+                "hard_stop": deadline.hard_stop.isoformat(),
+                "soft_stop": deadline.soft_stop.isoformat(),
+            }
+        )
+        manifest["status"] = "running"
+    else:
+        if args.resume:
+            raise RuntimeError(f"cannot resume missing output: {output_root}")
+        output_root.mkdir(parents=True)
+        manifest = {
+            "experiment_id": config["experiment_id"],
+            "status": "running",
+            "qualification_status": config["status"],
+            "config_hash": config_hash,
+            "source_run": str(source_run),
+            "source_run_config_hash": source_manifest["config_hash"],
+            "selection_data": config["selection_data"],
+            "git": git_state(),
+            "environment": environment_summary(),
+            "started_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+            "hard_stop": deadline.hard_stop.isoformat(),
+            "soft_stop": deadline.soft_stop.isoformat(),
+            "official_hypothesis_evidence": False,
+            "validation_accessed": False,
+            "test_accessed": False,
+        }
     atomic_write_json(output_root / "run_manifest.json", manifest)
     journal = EventJournal(output_root / "events.jsonl")
     journal.append("head_qualification_started", **manifest)
@@ -148,9 +172,9 @@ def run() -> int:
                     tolerance_grad=float(solver["tolerance_grad"]),
                 )
                 result.pop("weight")
-                result["fold"] = fold
                 fold_records.append(result)
                 journal.append("fold_completed", l2=l2, fold=fold, **result)
+                result["fold"] = fold
             record = {
                 "l2": l2,
                 "mean_eval_accuracy": statistics.fmean(
