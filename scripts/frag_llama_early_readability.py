@@ -659,8 +659,13 @@ def run_smoke(config: dict[str, Any], output_root: Path, journal: EventJournal) 
         }
         for value in values
     }
-    selected_alpha = max(
-        values, key=lambda value: (ridge_summaries[str(value)]["mean_accuracy"], -value)
+    ridge_maximum = max(
+        ridge_summaries[str(value)]["mean_accuracy"] for value in values
+    )
+    selected_alpha = min(
+        value
+        for value in values
+        if abs(ridge_summaries[str(value)]["mean_accuracy"] - ridge_maximum) <= 1e-12
     )
     selection["ridge"] = {
         "selected_alpha": selected_alpha,

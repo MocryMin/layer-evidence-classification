@@ -42,3 +42,12 @@ def test_smoke_tie_breaks_toward_lower_value():
     selected, summaries = select_smoke_value(rows, "learning_rate")
     assert selected == 0.001
     assert summaries["0.001"]["median_best_epoch"] == 90
+
+
+def test_smoke_treats_float32_ulps_as_ties():
+    rows = [
+        {"learning_rate": 0.1, "best_accuracy": 0.50000002, "best_epoch": 50},
+        {"learning_rate": 0.03, "best_accuracy": 0.5, "best_epoch": 50},
+    ]
+    selected, _ = select_smoke_value(rows, "learning_rate")
+    assert selected == 0.03

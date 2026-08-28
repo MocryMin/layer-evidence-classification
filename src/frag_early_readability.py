@@ -239,7 +239,16 @@ def select_smoke_value(
             "median_best_epoch": int(round(statistics.median(row["best_epoch"] for row in selected))),
             "n": len(selected),
         }
-    best = max(values, key=lambda value: (summaries[value]["mean_accuracy"], -value))
+    maximum_accuracy = max(item["mean_accuracy"] for item in summaries.values())
+    # Accuracies originate in float32 and equal correct-count fractions can
+    # differ by a few ulps after aggregation.  Honour the registered lower-
+    # value tie break within a tolerance much smaller than one sample.
+    tied = [
+        value
+        for value in values
+        if abs(summaries[value]["mean_accuracy"] - maximum_accuracy) <= 1e-7
+    ]
+    best = min(tied)
     return best, {str(value): summaries[value] for value in values}
 
 
