@@ -145,6 +145,11 @@ def prepare_run(
         manifest.setdefault("sessions", []).append(
             {"started_at": now, "hard_stop": deadline.hard_stop.isoformat(), "git": git_state()}
         )
+        # A recovered session keeps its prior failure in the append-only event
+        # journal.  Stale top-level terminal fields must not describe the new
+        # session or its eventual successful/soft-stop outcome.
+        for key in ("error", "error_type", "reason", "finished_at"):
+            manifest.pop(key, None)
         state["campaign_status"] = "running"
     else:
         if resume:
@@ -727,6 +732,8 @@ def run() -> int:
         )
         atomic_write_json(output_root / "discovery_summary.json", summary)
         manifest.update({"status": state["campaign_status"], "finished_at": datetime.now().astimezone().isoformat(timespec="seconds")})
+        for key in ("error", "error_type", "reason"):
+            manifest.pop(key, None)
         atomic_write_json(output_root / "run_manifest.json", manifest)
         journal.append("discovery_campaign_completed", **summary)
         print(json.dumps(summary, indent=2), flush=True)
@@ -741,6 +748,8 @@ def run() -> int:
         )
         atomic_write_json(output_root / "discovery_summary.json", summary)
         manifest.update({"status": "session_soft_stopped", "finished_at": datetime.now().astimezone().isoformat(timespec="seconds"), "reason": str(exc)})
+        for key in ("error", "error_type"):
+            manifest.pop(key, None)
         atomic_write_json(output_root / "run_manifest.json", manifest)
         journal.append("discovery_session_soft_stopped", reason=str(exc), gpu_seconds_used=state["gpu_seconds_used"])
         return 75
