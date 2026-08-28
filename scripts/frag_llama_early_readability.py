@@ -94,6 +94,8 @@ def prepare_run(
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         if manifest["config_hash"] != config_hash:
             raise RuntimeError("refusing resume because config changed")
+        if "last_error" in manifest:
+            manifest.setdefault("recovered_errors", []).append(manifest.pop("last_error"))
         if not resume:
             raise RuntimeError(f"output exists; pass --resume: {output_root}")
         manifest.setdefault("resume_history", []).append(
