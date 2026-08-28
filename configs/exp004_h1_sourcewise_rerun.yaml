@@ -1,0 +1,97 @@
+experiment_id: EXP-20260828-004-h1-sourcewise-rerun
+status: frozen_sourcewise_rerun_train_discovery
+protocol_document:
+  path: 'C:\研究生\实习\learn AI\ReadLLMPaper\ExperimentLogs\RESEARCH-001_layer-evidence-classification\EXP-20260821-004--Fixed Readout Head Imposes an Implicit Admissibility Constraint on Path Searching.md'
+  wsl_path: '/mnt/c/研究生/实习/learn AI/ReadLLMPaper/ExperimentLogs/RESEARCH-001_layer-evidence-classification/EXP-20260821-004--Fixed Readout Head Imposes an Implicit Admissibility Constraint on Path Searching.md'
+  sha256: 10b2e10dd62c70c6bef243124350704e2ae0ef4c92a9beb3147d791a0c636d9f
+protocol_supplement:
+  path: user_exp_plans/EXP-20260828-004-h1-sourcewise-rerun-protocol.md
+  sha256: ed6bd2691b4e4285c5101605c2146c47afd0c34321d93e6605c71d6e9cb2174a
+legacy_tranche:
+  artifact_root: artifacts/EXP-20260827-004-h1-discovery
+  role: combined_confirmation_candidates_only
+  excluded_from_new_search_and_sourcewise_denominators: true
+  discovery_summary_sha256: fac7cb4f74d7e488e6b77268be905d7ca1dd43ded1b2d6a68e16a5505ad8a4c4
+  run_manifest_sha256: 327de406bffb7662aea2deab35063b70d6b77e2925bfe64200eda6baeb1281a1
+source_qualification:
+  path: artifacts/EXP-20260827-004-h1-qualification
+  config_hash: dfc63de9f3397ecb98258c6e49421842ffed1635d76e71e7d0d33684a52b77d7
+head_qualification:
+  path: artifacts/EXP-20260827-004-h1-head-qualification-v2
+  config_hash: 435f712a691e28f5d72a49f9666949de3dd3bf4f47efd84c8e07f0e109c32640
+  selected_l2: 0.3
+split:
+  source: official_train_only
+  fit_size: 1750
+  discover_size: 501
+  seed: 17
+  indices_sha256: c5e33a578398304fe200386c0605e8b46e6a300394f91c5b4c7e32e40d52534f
+criteria:
+  epsilon_task: 0.05
+  gap_absolute: 0.15
+  gap_relative: 0.5
+  descriptive_prevalence_reference: 0.10
+head:
+  solver: full_batch_lbfgs
+  max_iter: 100
+  tolerance_grad: 0.0000001
+  bias: false
+  n_classes: 5
+search:
+  policy_version: sourcewise_temperature_v2
+  seed: 17
+  source_order: [S1, S2, S3, S4, S5]
+  source_roots:
+    S1: [1, 28]
+    S2: canonical
+    S3: []
+    S4: [1]
+    S5: [28]
+  initial_temperatures:
+    S1: 0.3
+    S2: 1.0
+    S3: 0.3
+    S4: 0.3
+    S5: 0.3
+  temperature_after_ten: 0.02 * n_good_source + 0.3
+  parent_distribution: pure_task_accuracy_softmax
+  operational_throttle:
+    preregistered: false
+    good_threshold: 100
+    keep_probability: 0.35
+    disclosure_required: true
+  max_path_length: 36
+  proposal_attempts: 100
+  candidate_cap: 5000
+  global_path_deduplication: true
+  roots_excluded_from_new_candidate_statistics: true
+  controls_excluded_from_prevalence: [canonical, repeat_L28, S1_seed, S4_seed, S5_seed]
+prefix_cache:
+  enabled: true
+  scope: global_across_sources
+  payload: all_token_hidden_before_final_rmsnorm
+  dtype: bfloat16
+  admission:
+    S1: preterminal_prefix
+    S2: read_only
+    S3: complete_path
+    S4: complete_path
+    S5: preterminal_prefix
+  ssd_root: artifacts/EXP-20260828-004-h1-sourcewise-rerun/prefix_cache_ssd
+  hdd_root: /mnt/e/layer-evidence-classification/EXP-20260828-004-h1-sourcewise-rerun-prefix-cache-hdd
+  ssd_cap_gib: 200
+  hdd_cap_gib: 1000
+  eviction: resident_leaf_lru
+campaign:
+  cumulative_model_resident_gpu_hours: 24.0
+  non_cache_artifact_cap_gib: 100
+  no_metric_early_stop: true
+runtime:
+  batch_size: 8
+  shard_size: 64
+  reserve_minutes: 15
+  seed: 17
+  deterministic: true
+  artifact_root: artifacts/EXP-20260828-004-h1-sourcewise-rerun
+  allow_validation: false
+  allow_test: false

@@ -29,6 +29,7 @@ from src.exp004_h1 import (  # noqa: E402
     canonical_json_hash,
     chance_accuracy,
     environment_summary,
+    extract_cached_path_feature_split,
     extract_path_feature_split,
     fit_masked_linear_head,
     git_state,
@@ -39,11 +40,14 @@ from src.exp004_h1 import (  # noqa: E402
     valid_choice_mask,
     verify_answer_tokens,
 )
+from src.exp004_h1_cache import GlobalPrefixCache  # noqa: E402
 from src.exp004_h1_search import (  # noqa: E402
     SOURCE_ORDER,
     edit_distance,
+    keep_throttled_source_turn,
     path_key,
     propose_candidate,
+    source_temperature,
 )
 
 
@@ -104,6 +108,8 @@ def initial_state(config_hash: str, seed: int) -> dict[str, Any]:
         "completed_search_candidates": 0,
         "candidate_ordinal": 0,
         "skipped_source_turns": {source: 0 for source in SOURCE_ORDER},
+        "throttle_skips": {source: 0 for source in SOURCE_ORDER},
+        "source_good_counts": {source: 0 for source in SOURCE_ORDER},
         "populations": {source: [] for source in SOURCE_ORDER},
         "bootstrap": {"canonical": False, "repeat_L28": False, "S4_seed": False, "S5_seed": False},
         "inflight": None,
@@ -128,6 +134,8 @@ def prepare_run(
         state = json.loads(state_path.read_text(encoding="utf-8"))
         if manifest["config_hash"] != config_hash or state["config_hash"] != config_hash:
             raise RuntimeError("refusing resume: frozen configuration changed")
+        state.setdefault("throttle_skips", {source: 0 for source in SOURCE_ORDER})
+        state.setdefault("source_good_counts", {source: 0 for source in SOURCE_ORDER})
         manifest.setdefault("sessions", []).append(
             {"started_at": now, "hard_stop": deadline.hard_stop.isoformat(), "git": git_state()}
         )
@@ -167,6 +175,19 @@ def artifact_bytes(root: Path) -> int:
     return sum(path.stat().st_size for path in root.rglob("*") if path.is_file())
 
 
+def non_cache_artifact_bytes(output_root: Path) -> int:
+    """Measure hypothesis artifacts without walking the separately capped cache."""
+    total = 0
+    for name in ("features", "heads", "results"):
+        target = output_root / name
+        if target.exists():
+            total += artifact_bytes(target)
+    for item in output_root.iterdir():
+        if item.is_file() and not item.name.startswith("prefix_cache_index.sqlite3"):
+            total += item.stat().st_size
+    return total
+
+
 def add_population_entry(state: dict[str, Any], source: str, result: dict[str, Any]) -> None:
     entries = state["populations"][source]
     if not any(entry["path_id"] == result["path_id"] for entry in entries):
@@ -185,6 +206,7 @@ def summary_document(
     canonical_task: float | None,
     canonical_native: float | None,
     chance: float | None,
+    prefix_cache: GlobalPrefixCache | None = None,
 ) -> dict[str, Any]:
     results = load_results(output_root)
     discovered = [item for item in results if item.get("count_in_prevalence", False)]
@@ -216,6 +238,9 @@ def summary_document(
         "chance_accuracy_discover": chance,
         "gpu_seconds_used": state["gpu_seconds_used"],
         "gpu_hours_used": state["gpu_seconds_used"] / 3600.0,
+        "source_good_counts_for_temperature": state.get("source_good_counts"),
+        "operational_throttle_skips": state.get("throttle_skips"),
+        "prefix_cache": None if prefix_cache is None else prefix_cache.stats(),
         "validation_accessed": False,
         "test_accessed": False,
     }
@@ -225,7 +250,11 @@ def run() -> int:
     args = parse_args()
     config_path = resolved(args.config).resolve()
     config = load_yaml(config_path)
-    if config["status"] != "frozen_official_train_discovery":
+    accepted_statuses = {
+        "frozen_official_train_discovery",
+        "frozen_sourcewise_rerun_train_discovery",
+    }
+    if config["status"] not in accepted_statuses:
         raise RuntimeError("official discovery requires the frozen status marker")
     if config["runtime"].get("allow_validation") or config["runtime"].get("allow_test"):
         raise RuntimeError("validation/test access is forbidden")
@@ -237,6 +266,9 @@ def run() -> int:
     # hash already stored in the run state.
     if not args.resume and file_sha256(protocol_path) != config["protocol_document"]["sha256"]:
         raise RuntimeError("host EXP-004 protocol document changed after freeze")
+    supplement = config.get("protocol_supplement")
+    if supplement and file_sha256(resolved(supplement["path"])) != supplement["sha256"]:
+        raise RuntimeError("H1 protocol supplement changed after freeze")
 
     deadline = DeadlineController(args.stop_at, int(config["runtime"]["reserve_minutes"]))
     deadline.install_signal_handlers()
@@ -266,6 +298,7 @@ def run() -> int:
     journal.append("discovery_session_started", pid=os.getpid(), hard_stop=deadline.hard_stop.isoformat())
 
     model = None
+    prefix_cache: GlobalPrefixCache | None = None
     resident_anchor: float | None = None
     canonical_task: float | None = None
     canonical_native: float | None = None
@@ -319,6 +352,30 @@ def run() -> int:
         results_root.mkdir(exist_ok=True)
         heads_root.mkdir(exist_ok=True)
 
+        cache_config = config.get("prefix_cache", {})
+        if cache_config.get("enabled", False):
+            prefix_cache = GlobalPrefixCache(
+                index_path=output_root / "prefix_cache_index.sqlite3",
+                ssd_root=resolved(cache_config["ssd_root"]),
+                hdd_root=Path(cache_config["hdd_root"]),
+                ssd_cap_bytes=int(float(cache_config["ssd_cap_gib"]) * 1024**3),
+                hdd_cap_bytes=int(float(cache_config["hdd_cap_gib"]) * 1024**3),
+                config_hash=config_hash,
+            )
+
+        def cache_target_for(record: dict[str, Any]) -> list[int] | None:
+            if prefix_cache is None:
+                return None
+            explicit = record.get("cache_target")
+            if explicit is not None:
+                return list(explicit) or None
+            path = list(record["path"])
+            if record["source"] in {"S1", "S5"}:
+                return path[:-1] or None
+            if record["source"] in {"S3", "S4"}:
+                return path or None
+            return None
+
         def process(record: dict[str, Any]) -> dict[str, Any]:
             nonlocal canonical_task, canonical_native
             result_path = results_root / f"{record['path_id']}.json"
@@ -326,27 +383,52 @@ def run() -> int:
                 return json.loads(result_path.read_text(encoding="utf-8"))
             deadline.checkpoint(next_unit_seconds=180.0)
             journal.append("path_started", path_id=record["path_id"], source=record["source"], path=record["path"])
+            cache_target = cache_target_for(record)
+            cached_prefix = None
+            if prefix_cache is not None:
+                prefix_cache.register_path(record["path"])
+                if cache_target is not None:
+                    prefix_cache.prepare_write(cache_target)
+                cached_prefix = prefix_cache.deepest_complete_prefix(record["path"])
             extraction = []
             for split_name in ("fit", "discover"):
+                extractor = (
+                    extract_cached_path_feature_split
+                    if prefix_cache is not None
+                    else extract_path_feature_split
+                )
+                kwargs = {
+                    "executor": executor,
+                    "tokenizer": tokenizer,
+                    "prompt_cfg": source_config["prompt"],
+                    "max_length_guard": int(source_config["tokenization"]["max_length_guard"]),
+                    "path": record["path"],
+                    "path_id": record["path_id"],
+                    "batch_size": int(config["runtime"]["batch_size"]),
+                    "shard_size": int(config["runtime"]["shard_size"]),
+                    "config_hash": config_hash,
+                    "feature_root": feature_root,
+                    "deadline": deadline,
+                    "journal": journal,
+                }
+                if prefix_cache is not None:
+                    kwargs.update(
+                        prefix_cache=prefix_cache,
+                        cached_prefix=cached_prefix,
+                        cache_target=cache_target,
+                    )
                 extraction.append(
-                    extract_path_feature_split(
+                    extractor(
                         split_name,
                         split_examples[split_name],
                         split_document[split_name],
-                        executor=executor,
-                        tokenizer=tokenizer,
-                        prompt_cfg=source_config["prompt"],
-                        max_length_guard=int(source_config["tokenization"]["max_length_guard"]),
-                        path=record["path"],
-                        path_id=record["path_id"],
-                        batch_size=int(config["runtime"]["batch_size"]),
-                        shard_size=int(config["runtime"]["shard_size"]),
-                        config_hash=config_hash,
-                        feature_root=feature_root,
-                        deadline=deadline,
-                        journal=journal,
+                        **kwargs,
                     )
                 )
+            if prefix_cache is not None and cache_target is not None:
+                target_node = prefix_cache.node(cache_target)
+                if target_node is not None and target_node["cache_status"] == "partial_ssd":
+                    prefix_cache.finalize_write(cache_target)
             fit = load_path_feature_split(feature_root, record["path_id"], "fit")
             discover = load_path_feature_split(feature_root, record["path_id"], "discover")
             fit_mask = valid_choice_mask(fit["choice_counts"], 5)
@@ -396,18 +478,25 @@ def run() -> int:
                 "edit_distance_from_canonical": edit_distance(record["path"], canonical_path),
                 "count_in_prevalence": bool(record.get("count_in_prevalence", False)),
                 "forward_batch_seconds": sum((item["batch_durations_seconds"] for item in extraction), []),
+                "cached_prefix": [] if cached_prefix is None else cached_prefix["path"],
+                "cache_tier": None if cached_prefix is None else cached_prefix["cache_status"],
+                "cache_target": cache_target,
             }
             atomic_write_json(result_path, result)
             journal.append("path_completed", path_id=record["path_id"], source=record["source"], task_accuracy=task_acc, native_accuracy=native_acc, good=good, collapse=collapse)
             return result
 
+        policy_version = config["search"].get("policy_version", "legacy_fixed_mixture")
         # Bootstrap controls and source roots. Each completed item is durable and idempotent.
         canonical_record = {"path_id": "canonical", "source": "baseline", "path": canonical_path, "count_in_prevalence": False}
         canonical_result = process(canonical_record)
         canonical_task = float(canonical_result["task_accuracy_discover"])
         canonical_native = float(canonical_result["native_accuracy_discover"])
-        for source in ("S1", "S2"):
-            add_population_entry(state, source, canonical_result)
+        if policy_version == "sourcewise_temperature_v2":
+            add_population_entry(state, "S2", canonical_result)
+        else:
+            for source in ("S1", "S2"):
+                add_population_entry(state, source, canonical_result)
         state["bootstrap"]["canonical"] = True
         persist_state()
 
@@ -415,17 +504,26 @@ def run() -> int:
         state["bootstrap"]["repeat_L28"] = True
         persist_state()
 
-        for source, path, marker in (("S4", [1], "S4_seed"), ("S5", [28], "S5_seed")):
-            seed_result = process({"path_id": f"{source}_seed", "source": source, "path": path, "parent_path_id": None, "mutation": {"operation": "fixed_seed"}, "count_in_prevalence": True})
+        seed_specs = [("S4", [1], "S4_seed"), ("S5", [28], "S5_seed")]
+        if policy_version == "sourcewise_temperature_v2":
+            seed_specs.insert(0, ("S1", [1, 28], "S1_seed"))
+            state["bootstrap"].setdefault("S1_seed", False)
+        for source, path, marker in seed_specs:
+            seed_result = process({"path_id": f"{source}_seed", "source": source, "path": path, "parent_path_id": None, "mutation": {"operation": "fixed_seed"}, "count_in_prevalence": policy_version != "sourcewise_temperature_v2"})
             add_population_entry(state, source, seed_result)
-            if not state["bootstrap"][marker]:
+            if policy_version != "sourcewise_temperature_v2" and not state["bootstrap"][marker]:
                 state["completed_search_candidates"] += 1
             state["bootstrap"][marker] = True
             persist_state()
         account_gpu_time()
 
         campaign_limit = float(config["campaign"]["cumulative_model_resident_gpu_hours"]) * 3600.0
-        artifact_limit = int(config["campaign"]["artifact_cap_gib"]) * 1024**3
+        artifact_cap = config["campaign"].get(
+            "non_cache_artifact_cap_gib", config["campaign"].get("artifact_cap_gib")
+        )
+        if artifact_cap is None:
+            raise RuntimeError("campaign artifact cap is missing")
+        artifact_limit = int(artifact_cap) * 1024**3
         candidate_cap = int(config["search"]["candidate_cap"])
         while True:
             if state["gpu_seconds_used"] >= campaign_limit:
@@ -435,7 +533,7 @@ def run() -> int:
                 state["campaign_status"] = "completed_candidate_safety_cap"
                 break
             deadline.checkpoint(next_unit_seconds=180.0)
-            if state["completed_search_candidates"] % 25 == 0 and artifact_bytes(output_root) >= artifact_limit:
+            if state["completed_search_candidates"] % 25 == 0 and non_cache_artifact_bytes(output_root) >= artifact_limit:
                 state["campaign_status"] = "completed_artifact_safety_cap"
                 break
 
@@ -443,12 +541,36 @@ def run() -> int:
                 source = SOURCE_ORDER[int(state["source_cursor"])]
                 rng = np.random.default_rng()
                 rng.bit_generator.state = state["rng_state"]
+                if policy_version == "sourcewise_temperature_v2":
+                    keep_turn = keep_throttled_source_turn(
+                        int(state["source_good_counts"][source]),
+                        rng,
+                        threshold=int(config["search"]["operational_throttle"]["good_threshold"]),
+                        keep_probability=float(config["search"]["operational_throttle"]["keep_probability"]),
+                    )
+                    state["rng_state"] = rng.bit_generator.state
+                    if not keep_turn:
+                        state["throttle_skips"][source] += 1
+                        state["source_cursor"] = (int(state["source_cursor"]) + 1) % len(SOURCE_ORDER)
+                        persist_state()
+                        journal.append("source_turn_throttle_skipped", source=source, source_good_count=state["source_good_counts"][source])
+                        continue
                 known = {path_key(item["path"]) for item in load_results(output_root)}
+                if policy_version == "sourcewise_temperature_v2":
+                    temperature = source_temperature(
+                        source,
+                        int(state["source_good_counts"][source]),
+                        {key: float(value) for key, value in config["search"]["initial_temperatures"].items()},
+                    )
+                    softmax_weight = 1.0
+                else:
+                    temperature = float(config["search"]["temperature"])
+                    softmax_weight = float(config["search"]["parent_softmax_weight"])
                 candidate = propose_candidate(
                     source, state["populations"], known, rng,
                     max_path_length=int(config["search"]["max_path_length"]),
-                    temperature=float(config["search"]["temperature"]),
-                    softmax_weight=float(config["search"]["parent_softmax_weight"]),
+                    temperature=temperature,
+                    softmax_weight=softmax_weight,
                     max_attempts=int(config["search"]["proposal_attempts"]),
                 )
                 state["rng_state"] = rng.bit_generator.state
@@ -469,10 +591,12 @@ def run() -> int:
             result = process(candidate)
             add_population_entry(state, candidate["source"], result)
             state["completed_search_candidates"] += 1
+            if policy_version == "sourcewise_temperature_v2" and result["good_path"]:
+                state["source_good_counts"][candidate["source"]] += 1
             state["source_cursor"] = (int(state["source_cursor"]) + 1) % len(SOURCE_ORDER)
             state["inflight"] = None
             account_gpu_time()
-            summary = summary_document(output_root, state, canonical_task, canonical_native, chance)
+            summary = summary_document(output_root, state, canonical_task, canonical_native, chance, prefix_cache)
             atomic_write_json(output_root / "discovery_summary.json", summary)
             print(
                 f"[{state['completed_search_candidates']:04d}] {result['source']} {result['path_id']} "
@@ -484,7 +608,7 @@ def run() -> int:
 
         account_gpu_time()
         persist_state()
-        summary = summary_document(output_root, state, canonical_task, canonical_native, chance)
+        summary = summary_document(output_root, state, canonical_task, canonical_native, chance, prefix_cache)
         atomic_write_json(output_root / "discovery_summary.json", summary)
         manifest.update({"status": state["campaign_status"], "finished_at": datetime.now().astimezone().isoformat(timespec="seconds")})
         atomic_write_json(output_root / "run_manifest.json", manifest)
@@ -495,7 +619,7 @@ def run() -> int:
         account_gpu_time()
         state["campaign_status"] = "session_soft_stopped"
         persist_state()
-        summary = summary_document(output_root, state, canonical_task, canonical_native, chance)
+        summary = summary_document(output_root, state, canonical_task, canonical_native, chance, prefix_cache)
         atomic_write_json(output_root / "discovery_summary.json", summary)
         manifest.update({"status": "session_soft_stopped", "finished_at": datetime.now().astimezone().isoformat(timespec="seconds"), "reason": str(exc)})
         atomic_write_json(output_root / "run_manifest.json", manifest)
@@ -510,6 +634,8 @@ def run() -> int:
         journal.append("discovery_failed", error_type=type(exc).__name__, error=str(exc))
         raise
     finally:
+        if prefix_cache is not None:
+            prefix_cache.close()
         if model is not None:
             del model
         if torch.cuda.is_available():

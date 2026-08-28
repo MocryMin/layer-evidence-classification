@@ -24,12 +24,15 @@ from src.exp004_h1 import (  # noqa: E402
     stratified_fold_ids,
     valid_choice_mask,
 )
+from src.exp004_h1_cache import GlobalPrefixCache, prefix_key  # noqa: E402
 from scripts.exp004_h1_structured_pilot import structured_path_pool  # noqa: E402
 from src.exp004_h1_search import (  # noqa: E402
     SOURCE_ORDER,
+    keep_throttled_source_turn,
     parent_probabilities,
     path_key,
     propose_candidate,
+    source_temperature,
 )
 
 
@@ -104,6 +107,39 @@ class TestAtomicArtifactsAndDeadline(unittest.TestCase):
         self.assertGreater(deadline.seconds_to_soft_stop(), 0)
 
 
+class TestGlobalPrefixCache(unittest.TestCase):
+    def test_cross_source_identity_is_only_the_prefix(self):
+        self.assertEqual(prefix_key([1, 4, 28]), prefix_key([1, 4, 28]))
+        self.assertNotEqual(prefix_key([1, 4, 28]), prefix_key([1, 5, 28]))
+
+    def test_deepest_complete_prefix_and_leaf_lru_eviction(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cache = GlobalPrefixCache(
+                index_path=root / "index.sqlite3",
+                ssd_root=root / "ssd",
+                hdd_root=root / "hdd",
+                ssd_cap_bytes=5,
+                hdd_cap_bytes=20,
+                config_hash="test-hash",
+            )
+            try:
+                for path, payload in (([1], b"1234"), ([1, 2], b"5678")):
+                    cache.prepare_write(path)
+                    target = cache.shard_path(path, "fit", 0, 1, writing=True)
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    target.write_bytes(payload)
+                    cache.finalize_write(path)
+                match = cache.deepest_complete_prefix([1, 2, 3])
+                self.assertIsNotNone(match)
+                self.assertEqual(match["path"], [1, 2])
+                statuses = {cache.node([1])["cache_status"], cache.node([1, 2])["cache_status"]}
+                self.assertEqual(statuses, {"ssd", "hdd"})
+                self.assertGreaterEqual(cache.stats()["registered_nodes"], 3)
+            finally:
+                cache.close()
+
+
 class TestStructuredPilotPool(unittest.TestCase):
     def test_pool_has_expected_transparent_controls(self):
         pool = structured_path_pool(list(range(1, 29)))
@@ -159,10 +195,39 @@ class TestFrozenDiscoveryPolicy(unittest.TestCase):
         s3 = self.proposal("S3", {path_key([1]), path_key([28])})
         self.assertEqual(len(s3["path"]), 1)
 
+    def test_sourcewise_s1_root_is_two_endpoint_nodes(self):
+        self.populations["S1"] = [
+            {"path_id": "S1_seed", "path": [1, 28], "task_accuracy_discover": 0.2}
+        ]
+        child = self.proposal("S1")
+        self.assertEqual(len(child["path"]), 3)
+        self.assertEqual(child["path"][0], 1)
+        self.assertEqual(child["path"][-1], 28)
+
     def test_duplicate_retry_is_deterministic(self):
         first = self.proposal("S1")
         second = self.proposal("S1")
         self.assertEqual(first, second)
+
+    def test_source_local_temperature_schedule(self):
+        initials = {"S1": 0.3, "S2": 1.0, "S3": 0.3, "S4": 0.3, "S5": 0.3}
+        self.assertEqual(source_temperature("S1", 0, initials), 0.3)
+        self.assertEqual(source_temperature("S2", 10, initials), 1.0)
+        self.assertAlmostEqual(source_temperature("S2", 11, initials), 0.52)
+        self.assertAlmostEqual(source_temperature("S3", 100, initials), 2.3)
+
+    def test_operational_source_throttle_is_source_local(self):
+        import numpy as np
+
+        rng = np.random.default_rng(17)
+        self.assertTrue(
+            keep_throttled_source_turn(99, rng, threshold=100, keep_probability=0.35)
+        )
+        draws = [
+            keep_throttled_source_turn(100, rng, threshold=100, keep_probability=0.35)
+            for _ in range(10_000)
+        ]
+        self.assertAlmostEqual(sum(draws) / len(draws), 0.35, delta=0.02)
 
 
 if __name__ == "__main__":

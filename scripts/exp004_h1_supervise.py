@@ -55,6 +55,8 @@ def append_event(path: Path, event: str, **payload: Any) -> None:
 
 def progress_fingerprint(output_root: Path) -> tuple[int, int, int]:
     state_path = output_root / "search_state.json"
+    if not state_path.is_file():
+        return 0, 0, 0
     state = json.loads(state_path.read_text(encoding="utf-8"))
     results = sum(1 for _ in (output_root / "results").glob("*.json"))
     shards = sum(1 for _ in (output_root / "features").glob("**/shard_*.pt"))
@@ -68,8 +70,6 @@ def run() -> int:
     config_path = resolved(args.config).resolve()
     config = load_yaml(config_path)
     output_root = resolved(config["runtime"]["artifact_root"]).resolve()
-    if not (output_root / "search_state.json").is_file():
-        raise RuntimeError("supervisor requires an existing resumable discovery")
     hard_stop = datetime.fromisoformat(args.stop_at)
     if hard_stop.tzinfo is None or hard_stop.utcoffset() is None:
         raise ValueError("--stop-at must include an explicit UTC offset")
@@ -100,8 +100,9 @@ def run() -> int:
             str(config_path),
             "--stop-at",
             args.stop_at,
-            "--resume",
         ]
+        if (output_root / "search_state.json").is_file():
+            command.append("--resume")
         append_event(event_path, "child_started", attempt=attempt, progress=previous)
         child = subprocess.Popen(command, cwd=ROOT)
         return_code = child.wait()
@@ -118,7 +119,11 @@ def run() -> int:
             return return_code
         if signal_received is not None:
             return 128 + signal_received
-        manifest = json.loads((output_root / "run_manifest.json").read_text(encoding="utf-8"))
+        manifest_path = output_root / "run_manifest.json"
+        if not manifest_path.is_file():
+            append_event(event_path, "failed_before_manifest", return_code=return_code)
+            return return_code or 1
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         if manifest.get("status") != "failed_resumable":
             append_event(event_path, "non_resumable_exit", status=manifest.get("status"))
             return return_code or 1

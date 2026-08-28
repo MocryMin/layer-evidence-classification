@@ -44,6 +44,44 @@ def parent_probabilities(
     return softmax_weight * softmax + (1.0 - softmax_weight) * uniform
 
 
+def source_temperature(
+    source: str,
+    source_good_count: int,
+    initial_temperatures: dict[str, float],
+) -> float:
+    """Return the user-specified source-local temperature schedule.
+
+    ``source_good_count`` counts only newly generated discovery-good paths in
+    the current strategy tranche.  Fixed roots and legacy candidates do not
+    advance the schedule.
+    """
+    if source not in SOURCE_ORDER:
+        raise ValueError(f"unknown source: {source}")
+    if source_good_count < 0:
+        raise ValueError("source_good_count must be non-negative")
+    initial = float(initial_temperatures[source])
+    if initial <= 0:
+        raise ValueError("initial source temperature must be positive")
+    if source_good_count <= 10:
+        return initial
+    return 0.02 * source_good_count + 0.3
+
+
+def keep_throttled_source_turn(
+    source_good_count: int,
+    rng: np.random.Generator,
+    *,
+    threshold: int,
+    keep_probability: float,
+) -> bool:
+    """Operational post-freeze source throttle, applied on round-robin turns."""
+    if threshold < 1 or not 0 < keep_probability <= 1:
+        raise ValueError("invalid source throttle")
+    if source_good_count < threshold:
+        return True
+    return bool(rng.random() < keep_probability)
+
+
 def _choose_parent(
     entries: list[dict[str, Any]],
     rng: np.random.Generator,

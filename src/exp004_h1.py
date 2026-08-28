@@ -303,6 +303,61 @@ class ModularLlamaExecutor:
         return terminal, self.label_logits(terminal)
 
     @torch.inference_mode()
+    def forward_path_from_prefix(
+        self,
+        input_ids: torch.Tensor,
+        attention_mask: torch.Tensor,
+        path: Sequence[int],
+        *,
+        cached_prefix_length: int = 0,
+        cached_hidden: torch.Tensor | None = None,
+        capture_prefix_length: int | None = None,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor | None]:
+        """Continue a path from a globally cached raw hidden state.
+
+        Cached and captured tensors are before the final RMSNorm and contain
+        every token.  This is necessary because another decoder block needs the
+        whole sequence, not only the terminal token.
+        """
+        embeddings, position_ids, causal_mask, position_embeddings = self._inputs(
+            input_ids, attention_mask
+        )
+        if not 0 <= cached_prefix_length <= len(path):
+            raise ValueError("cached prefix length is outside the path")
+        if cached_prefix_length:
+            if cached_hidden is None:
+                raise ValueError("a non-empty cached prefix requires hidden state")
+            if tuple(cached_hidden.shape) != tuple(embeddings.shape):
+                raise ValueError(
+                    f"cached hidden shape {tuple(cached_hidden.shape)} != {tuple(embeddings.shape)}"
+                )
+            hidden = cached_hidden.to(device=embeddings.device, dtype=embeddings.dtype)
+        else:
+            hidden = embeddings
+        if capture_prefix_length is not None and not (
+            cached_prefix_length <= capture_prefix_length <= len(path)
+        ):
+            raise ValueError("capture prefix must be reachable from the cached prefix")
+        captured = hidden if capture_prefix_length == cached_prefix_length else None
+        n_layers = len(self.backbone.layers)
+        for offset, layer_id in enumerate(path[cached_prefix_length:], start=cached_prefix_length + 1):
+            if not 1 <= int(layer_id) <= n_layers:
+                raise ValueError(f"layer id {layer_id} outside 1..{n_layers}")
+            hidden = self.backbone.layers[int(layer_id) - 1](
+                hidden,
+                attention_mask=causal_mask,
+                position_embeddings=position_embeddings,
+                position_ids=position_ids,
+                past_key_values=None,
+                use_cache=False,
+            )
+            if offset == capture_prefix_length:
+                captured = hidden
+        normalised = self.backbone.norm(hidden)
+        terminal = self._terminal(normalised, attention_mask)
+        return terminal, self.label_logits(terminal), captured
+
+    @torch.inference_mode()
     def forward_native(
         self, input_ids: torch.Tensor, attention_mask: torch.Tensor
     ) -> tuple[torch.Tensor, torch.Tensor]:
@@ -485,6 +540,187 @@ def extract_path_feature_split(
         "n_samples": len(examples),
         "n_reused": n_reused,
         "batch_durations_seconds": batch_durations,
+    }
+
+
+def extract_cached_path_feature_split(
+    split_name: str,
+    examples: Sequence[ArcExample],
+    original_indices: Sequence[int],
+    *,
+    executor: ModularLlamaExecutor,
+    tokenizer: Any,
+    prompt_cfg: dict[str, Any],
+    max_length_guard: int,
+    path: Sequence[int],
+    path_id: str,
+    batch_size: int,
+    shard_size: int,
+    config_hash: str,
+    feature_root: Path,
+    deadline: DeadlineController,
+    journal: EventJournal,
+    prefix_cache: Any,
+    cached_prefix: dict[str, Any] | None,
+    cache_target: Sequence[int] | None,
+) -> dict[str, Any]:
+    """Extract features while reading/writing one global prefix-cache payload."""
+    split_root = feature_root / path_id / split_name
+    split_root.mkdir(parents=True, exist_ok=True)
+    device = next(executor.causal_lm.parameters()).device
+    batch_durations: list[float] = []
+    n_reused = 0
+    cached_prefix_path = [] if cached_prefix is None else list(cached_prefix["path"])
+    cached_status = None if cached_prefix is None else str(cached_prefix["cache_status"])
+    target_path = None if cache_target is None else list(cache_target)
+    target_node = None if target_path is None else prefix_cache.node(target_path)
+    write_target = bool(target_node and target_node["cache_status"] == "partial_ssd")
+
+    for shard_start in range(0, len(examples), shard_size):
+        next_estimate = max(batch_durations[-5:] or [60.0])
+        deadline.checkpoint(next_unit_seconds=next_estimate)
+        shard_end = min(shard_start + shard_size, len(examples))
+        shard_path = split_root / f"shard_{shard_start:05d}_{shard_end:05d}.pt"
+        expected_indices = list(original_indices[shard_start:shard_end])
+        target_shard = None
+        if write_target and target_path is not None:
+            target_shard = prefix_cache.shard_path(
+                target_path, split_name, shard_start, shard_end, writing=True
+            )
+        reusable_feature = shard_path.exists() and (target_shard is None or target_shard.exists())
+        if reusable_feature:
+            saved = torch.load(shard_path, map_location="cpu", weights_only=False)
+            if (
+                saved["config_hash"] != config_hash
+                or saved["original_indices"] != expected_indices
+                or saved["path"] != list(path)
+            ):
+                raise RuntimeError(f"resume validation failed for {shard_path}")
+            n_reused += shard_end - shard_start
+            continue
+
+        cached_batches = None
+        if cached_prefix is not None:
+            cache_shard_path = prefix_cache.shard_path(
+                cached_prefix_path, split_name, shard_start, shard_end
+            )
+            cache_payload = torch.load(cache_shard_path, map_location="cpu", weights_only=False)
+            if (
+                cache_payload["config_hash"] != config_hash
+                or cache_payload["prefix"] != cached_prefix_path
+                or cache_payload["original_indices"] != expected_indices
+            ):
+                raise RuntimeError(f"prefix-cache validation failed for {cache_shard_path}")
+            cached_batches = cache_payload["hidden_batches"]
+
+        shard_examples = examples[shard_start:shard_end]
+        features: list[torch.Tensor] = []
+        logits: list[torch.Tensor] = []
+        captured_batches: list[torch.Tensor] = []
+        shard_batch_durations: list[float] = []
+        journal.append(
+            "path_shard_started",
+            path_id=path_id,
+            split=split_name,
+            start=shard_start,
+            end=shard_end,
+            cached_prefix=cached_prefix_path,
+            cache_tier=cached_status,
+            cache_target=target_path,
+        )
+        shard_t0 = time.monotonic()
+        for batch_number, batch_start in enumerate(range(0, len(shard_examples), batch_size)):
+            next_estimate = max(batch_durations[-5:] or [60.0])
+            deadline.checkpoint(next_unit_seconds=next_estimate)
+            batch_examples = shard_examples[batch_start : batch_start + batch_size]
+            encoded = encode_arc_examples(tokenizer, batch_examples, prompt_cfg)
+            if encoded["input_ids"].shape[1] > max_length_guard:
+                raise RuntimeError(
+                    f"token length {encoded['input_ids'].shape[1]} exceeds max_length_guard"
+                )
+            input_ids = encoded["input_ids"].to(device, non_blocking=True)
+            attention_mask = encoded["attention_mask"].to(device, non_blocking=True)
+            hidden = None
+            if cached_batches is not None:
+                hidden = cached_batches[batch_number]
+            batch_t0 = time.monotonic()
+            terminal, label_logits, captured = executor.forward_path_from_prefix(
+                input_ids,
+                attention_mask,
+                path,
+                cached_prefix_length=len(cached_prefix_path),
+                cached_hidden=hidden,
+                capture_prefix_length=None if not write_target else len(target_path or []),
+            )
+            if device.type == "cuda":
+                torch.cuda.synchronize(device)
+            duration = time.monotonic() - batch_t0
+            batch_durations.append(duration)
+            shard_batch_durations.append(duration)
+            features.append(terminal.to(dtype=torch.float16, device="cpu"))
+            logits.append(label_logits.float().cpu())
+            if write_target:
+                if captured is None:
+                    raise RuntimeError("requested cache target was not captured")
+                captured_batches.append(captured.to(dtype=torch.bfloat16, device="cpu"))
+
+        if target_shard is not None:
+            atomic_torch_save(
+                target_shard,
+                {
+                    "config_hash": config_hash,
+                    "prefix": target_path,
+                    "split": split_name,
+                    "start": shard_start,
+                    "end": shard_end,
+                    "original_indices": expected_indices,
+                    "hidden_batches": captured_batches,
+                    "batch_size": batch_size,
+                },
+            )
+        payload = {
+            "config_hash": config_hash,
+            "path_id": path_id,
+            "path": list(path),
+            "split": split_name,
+            "start": shard_start,
+            "end": shard_end,
+            "original_indices": expected_indices,
+            "sample_ids": [item.sample_id for item in shard_examples],
+            "labels": torch.tensor(
+                [item.answer_position for item in shard_examples], dtype=torch.long
+            ),
+            "choice_counts": torch.tensor(
+                [item.n_choices for item in shard_examples], dtype=torch.int8
+            ),
+            "features": torch.cat(features, dim=0),
+            "native_label_logits": torch.cat(logits, dim=0),
+            "elapsed_seconds": time.monotonic() - shard_t0,
+            "batch_durations_seconds": shard_batch_durations,
+            "cached_prefix": cached_prefix_path,
+            "cache_tier": cached_status,
+            "cache_target": target_path,
+        }
+        atomic_torch_save(shard_path, payload)
+        journal.append(
+            "path_shard_completed",
+            path_id=path_id,
+            split=split_name,
+            start=shard_start,
+            end=shard_end,
+            elapsed_seconds=payload["elapsed_seconds"],
+            cached_prefix=cached_prefix_path,
+            cache_target=target_path,
+        )
+    return {
+        "path_id": path_id,
+        "split": split_name,
+        "n_samples": len(examples),
+        "n_reused": n_reused,
+        "batch_durations_seconds": batch_durations,
+        "cached_prefix": cached_prefix_path,
+        "cache_tier": cached_status,
+        "cache_target": target_path,
     }
 
 
