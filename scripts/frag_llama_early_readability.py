@@ -186,6 +186,78 @@ def load_features(output_root: Path, split: str) -> dict[str, Any]:
     }
 
 
+@torch.inference_mode()
+def audit_path_implementation_same_process(
+    *,
+    executor: ModularLlamaExecutor,
+    tokenizer: Any,
+    examples: list[Any],
+    prompt_cfg: dict[str, Any],
+    output_root: Path,
+    config: dict[str, Any],
+) -> None:
+    """Compare the batched 56-path implementation to the canonical executor."""
+    encoded = encode_arc_examples(tokenizer, examples, prompt_cfg)
+    input_ids = encoded["input_ids"].to("cuda")
+    attention_mask = encoded["attention_mask"].to("cuda")
+    embeddings, position_ids, causal_mask, position_embeddings = executor._inputs(
+        input_ids, attention_mask
+    )
+    single_terminals = []
+    for layer in executor.backbone.layers:
+        hidden = layer(
+            embeddings,
+            attention_mask=causal_mask,
+            position_embeddings=position_embeddings,
+            position_ids=position_ids,
+            past_key_values=None,
+            use_cache=False,
+        )
+        single_terminals.append(executor._terminal(hidden, attention_mask))
+    prefix_terminals = []
+    hidden = embeddings
+    for layer in executor.backbone.layers:
+        hidden = layer(
+            hidden,
+            attention_mask=causal_mask,
+            position_embeddings=position_embeddings,
+            position_ids=position_ids,
+            past_key_values=None,
+            use_cache=False,
+        )
+        prefix_terminals.append(executor._terminal(hidden, attention_mask))
+    raw = torch.stack(
+        [torch.stack(single_terminals, dim=1), torch.stack(prefix_terminals, dim=1)],
+        dim=1,
+    )
+    batched_terminal = executor.backbone.norm(raw)[:, FAMILIES.index("canonical_prefix"), -1]
+    batched_logits = executor.label_logits(batched_terminal)
+    direct_terminal, direct_logits = executor.forward_path(
+        input_ids, attention_mask, list(range(1, len(executor.backbone.layers) + 1))
+    )
+    feature_difference = (batched_terminal.float() - direct_terminal.float()).abs()
+    logit_difference = (batched_logits.float() - direct_logits.float()).abs()
+    audit = {
+        "n_samples": len(examples),
+        "comparison": "same-process optimized 56-path prefix_L28 vs ModularLlamaExecutor.forward_path",
+        "feature_max_abs": float(feature_difference.max().item()),
+        "feature_mean_abs": float(feature_difference.mean().item()),
+        "logit_max_abs": float(logit_difference.max().item()),
+        "logit_mean_abs": float(logit_difference.mean().item()),
+    }
+    audit["passed"] = (
+        audit["feature_max_abs"]
+        <= float(config["audit"]["prefix_L28_max_abs_tolerance"])
+        and audit["feature_mean_abs"]
+        <= float(config["audit"]["prefix_L28_mean_abs_tolerance"])
+        and audit["logit_max_abs"] <= 0.02
+        and audit["logit_mean_abs"] <= 0.001
+    )
+    atomic_write_json(output_root / "within_process_path_equivalence.json", audit)
+    if not audit["passed"]:
+        raise RuntimeError(f"same-process path implementation audit failed: {audit}")
+
+
 def audit_extracted_features(config: dict[str, Any], output_root: Path) -> None:
     """Validate shape/finiteness and reproduce the prior canonical path."""
     expected_sizes = {
@@ -328,6 +400,14 @@ def extract_features(
     n_layers = int(config["model"]["layers"])
     if len(executor.backbone.layers) != n_layers:
         raise RuntimeError("model/config layer count mismatch")
+    audit_path_implementation_same_process(
+        executor=executor,
+        tokenizer=tokenizer,
+        examples=[train[index] for index in indices["discover"][:2]],
+        prompt_cfg=config["prompt"],
+        output_root=output_root,
+        config=config,
+    )
     batch_size = int(config["runtime"]["batch_size"])
     shard_size = int(config["runtime"]["shard_size"])
     max_length = int(config["prompt"]["max_length_guard"])
@@ -814,6 +894,18 @@ def stable_onset(curve: list[dict[str, Any]], threshold: float) -> int | None:
     return None
 
 
+def wilson_interval(successes: int, n: int, z: float = 1.959963984540054) -> list[float]:
+    proportion = successes / n
+    denominator = 1.0 + z * z / n
+    centre = (proportion + z * z / (2.0 * n)) / denominator
+    radius = (
+        z
+        * math.sqrt(proportion * (1.0 - proportion) / n + z * z / (4.0 * n * n))
+        / denominator
+    )
+    return [centre - radius, centre + radius]
+
+
 def build_report(config: dict[str, Any], output_root: Path, journal: EventJournal) -> None:
     result_paths = sorted((output_root / "probe_paths").glob("*_L??.json"))
     if len(result_paths) != int(config["paths"]["n_paths"]):
@@ -848,6 +940,76 @@ def build_report(config: dict[str, Any], output_root: Path, journal: EventJourna
                 canonical, threshold
             ),
         }
+    prediction_root = output_root / "probe_paths"
+    metadata = torch.load(
+        prediction_root / "single_L01_predictions.pt",
+        map_location="cpu",
+        weights_only=False,
+    )
+    labels = metadata["labels"].long()
+    choice_counts = metadata["choice_counts"].long()
+    n_discover = int(labels.numel())
+    chance = float(sum(1.0 / int(value) for value in choice_counts) / n_discover)
+    label_histogram = torch.bincount(labels, minlength=5)
+    majority_count = int(label_histogram.max().item())
+    majority_accuracy = majority_count / n_discover
+    single_summary = {}
+    for method in methods:
+        curve = curves[method]["single_block"]
+        best = max(curve, key=lambda row: row["accuracy"])
+        single_summary[method] = {
+            "mean_accuracy_across_layers": statistics.fmean(
+                row["accuracy"] for row in curve
+            ),
+            "minimum_accuracy": min(row["accuracy"] for row in curve),
+            "maximum_accuracy": best["accuracy"],
+            "maximum_layer": best["layer"],
+            "maximum_wilson_95": wilson_interval(
+                int(round(best["accuracy"] * n_discover)), n_discover
+            ),
+        }
+    trained_methods = ("plain", "ln_plain", "ridge", "h1_rms_lbfgs")
+    trained_single_best_method = max(
+        trained_methods, key=lambda method: single_summary[method]["maximum_accuracy"]
+    )
+    transition_summary = {}
+    for method in methods:
+        curve = curves[method]["canonical_prefix"]
+        transition_summary[method] = {
+            f"first_at_least_{str(level).replace('.', '_')}": next(
+                (row["layer"] for row in curve if row["accuracy"] >= level), None
+            )
+            for level in (0.5, 0.8, 0.9)
+        }
+    from scipy.stats import binomtest
+
+    paired_native_vs_h1 = []
+    for layer in range(12, 17):
+        predictions = torch.load(
+            prediction_root / f"prefix_L{layer:02d}_predictions.pt",
+            map_location="cpu",
+            weights_only=False,
+        )
+        native_correct = predictions["native"].long() == labels
+        h1_correct = predictions["h1_rms_lbfgs"].long() == labels
+        h1_only = int((~native_correct & h1_correct).sum().item())
+        native_only = int((native_correct & ~h1_correct).sum().item())
+        discordant = h1_only + native_only
+        paired_native_vs_h1.append(
+            {
+                "layer": layer,
+                "native_accuracy": float(native_correct.float().mean().item()),
+                "h1_rms_lbfgs_accuracy": float(h1_correct.float().mean().item()),
+                "paired_accuracy_difference": (h1_only - native_only) / n_discover,
+                "h1_only_correct": h1_only,
+                "native_only_correct": native_only,
+                "mcnemar_exact_two_sided_p_unadjusted": float(
+                    binomtest(min(h1_only, native_only), discordant, 0.5).pvalue
+                    if discordant
+                    else 1.0
+                ),
+            }
+        )
     variance = json.loads((output_root / "variance_summary.json").read_text(encoding="utf-8"))
     selection = json.loads((output_root / "smoke" / "selection.json").read_text(encoding="utf-8"))
     summary = {
@@ -861,6 +1023,17 @@ def build_report(config: dict[str, Any], output_root: Path, journal: EventJourna
         "variance": variance,
         "smoke_selection": selection,
         "early_exit_onsets": onsets,
+        "D_discover_baselines": {
+            "n": n_discover,
+            "choice_count_uniform_chance": chance,
+            "label_histogram_A_to_E": label_histogram.tolist(),
+            "posthoc_majority_label_accuracy": majority_accuracy,
+            "posthoc_majority_wilson_95": wilson_interval(majority_count, n_discover),
+        },
+        "single_block_summary": single_summary,
+        "best_trained_single_block_method": trained_single_best_method,
+        "canonical_prefix_absolute_thresholds": transition_summary,
+        "paired_native_vs_h1_prefix_L12_to_L16": paired_native_vs_h1,
         "curves": curves,
     }
     atomic_write_json(output_root / "summary.json", summary)
@@ -885,6 +1058,7 @@ def build_report(config: dict[str, Any], output_root: Path, journal: EventJourna
         f"EXP-002 collapse threshold: `{variance['threshold']}`. Collapsed raw D_fit paths: "
         f"**{variance['n_collapsed']}/{variance['n_paths']}**. Minimum inter-sample std mean: "
         f"`{variance['minimum_inter_sample_std_mean']:.6g}` at `{variance['minimum_path_id']}`.",
+        "This rules out gross EXP-002-scale collapse, but variance alone is not task information.",
         "",
         "## D_fit-only smoke selection",
         "",
@@ -894,17 +1068,82 @@ def build_report(config: dict[str, Any], output_root: Path, journal: EventJourna
         f"{selection['adamw']['ln_plain']['final_epochs']} fixed full-data epochs.",
         f"- RidgeClassifier: alpha `{selection['ridge']['selected_alpha']}`.",
         "",
+        "## D_discover baselines and single-block result",
+        "",
+        f"The option-count-weighted uniform-chance baseline is `{chance:.4f}`. The post-hoc "
+        f"majority answer-position frequency is `{majority_accuracy:.4f}` "
+        f"({label_histogram.tolist()} for A--E). The latter is descriptive, not a pre-registered comparator.",
+        "",
+        "| Readout | Mean over 28 `[l]` paths | Best `[l]` accuracy | Best layer | 95% Wilson CI at selected best |",
+        "|---|---:|---:|---:|---:|",
+    ]
+    for method in methods:
+        item = single_summary[method]
+        lines.append(
+            f"| {method} | {item['mean_accuracy_across_layers']:.4f} | "
+            f"{item['maximum_accuracy']:.4f} | {item['maximum_layer']} | "
+            f"[{item['maximum_wilson_95'][0]:.4f}, {item['maximum_wilson_95'][1]:.4f}] |"
+        )
+    trained_best = single_summary[trained_single_best_method]
+    lines.extend(
+        [
+            "",
+            f"Across the four fitted linear readouts, the selected maximum is "
+            f"`{trained_best['maximum_accuracy']:.4f}` ({trained_single_best_method}, "
+            f"layer {trained_best['maximum_layer']}), only "
+            f"`{trained_best['maximum_accuracy'] - majority_accuracy:+.4f}` above the post-hoc "
+            "majority frequency. This is a maximum over 112 fitted path/readout cells and must not be "
+            "treated as confirmatory evidence. The complete pattern provides no systematic LN, Ridge, "
+            "or L-BFGS rescue of isolated single-block paths.",
+            "",
         "## Canonical-prefix early-exit summary on D_discover",
         "",
         "| Readout | Prefix L28 | First within 5 pp | First 3 consecutive within 5 pp |",
         "|---|---:|---:|---:|",
-    ]
+        ]
+    )
     for method in methods:
         item = onsets[method]
         lines.append(
             f"| {method} | {item['prefix_L28_accuracy']:.4f} | "
             f"{item['first_prefix_within_5pp']} | "
             f"{item['first_three_consecutive_prefixes_within_5pp']} |"
+        )
+    lines.extend(
+        [
+            "",
+            "Absolute threshold crossings:",
+            "",
+            "| Readout | First prefix >= 0.50 | >= 0.80 | >= 0.90 |",
+            "|---|---:|---:|---:|",
+        ]
+    )
+    for method in methods:
+        item = transition_summary[method]
+        lines.append(
+            f"| {method} | {item['first_at_least_0_5']} | "
+            f"{item['first_at_least_0_8']} | {item['first_at_least_0_9']} |"
+        )
+    lines.extend(
+        [
+            "",
+            "The trained readouts first exceed 0.50 at prefix L13, whereas the native readout "
+            "remains near chance through L15 and first exceeds 0.50 at L16.",
+            "",
+            "Paired native-versus-H1-readout comparison (exact McNemar p-values are exploratory, "
+            "two-sided, unadjusted for the five inspected layers):",
+            "",
+            "| Prefix | Native | H1 RMS+LBFGS | Paired gain | H1-only / native-only correct | p |",
+            "|---|---:|---:|---:|---:|---:|",
+        ]
+    )
+    for item in paired_native_vs_h1:
+        lines.append(
+            f"| L{item['layer']} | {item['native_accuracy']:.4f} | "
+            f"{item['h1_rms_lbfgs_accuracy']:.4f} | "
+            f"{item['paired_accuracy_difference']:+.4f} | "
+            f"{item['h1_only_correct']} / {item['native_only_correct']} | "
+            f"{item['mcnemar_exact_two_sided_p_unadjusted']:.3g} |"
         )
     lines.extend(
         [
@@ -931,9 +1170,13 @@ def build_report(config: dict[str, Any], output_root: Path, journal: EventJourna
             "",
             "## Interpretation boundary",
             "",
-            "A non-collapsed variance result rules out EXP-001-style gross feature collapse, but does not establish task information. "
-            "Ridge/LN-Plain success with Plain failure supports an optimisation/conditioning explanation. Failure of all linear readouts "
-            "supports absence of linearly decodable task signal, not absence of all information. This diagnostic has no official-test claim.",
+            "The evidence separates the two path families. Isolated single blocks retain non-zero sample variation but show no "
+            "generalizable linear ARC signal under Plain, LN-Plain, Ridge, or the H1 L-BFGS head. Canonical prefixes show a different "
+            "phenomenon: trained linear readouts expose a transition beginning at L12--L13, while the native A--E head remains near "
+            "chance until L16. Thus gross feature collapse and an unsmoked Plain learning rate do not explain the short-path failure; "
+            "the prefix L12--L15 gap is consistent with readout incompatibility, while `[l]` failure is consistent only with absence of "
+            "generalizable *linear* task signal. It does not prove absence of nonlinear information. This diagnostic used no official "
+            "validation/test data and is not an EXP-004 hypothesis decision.",
             "",
         ]
     )
@@ -965,7 +1208,11 @@ def run() -> int:
             elif phase == "report":
                 build_report(config, output_root, journal)
             finish_phase(output_root, manifest, journal, phase)
-        manifest["status"] = "completed" if args.phase == "all" else "phase_completed"
+        manifest["status"] = (
+            "completed"
+            if all(phase in manifest["completed_phases"] for phase in PHASES)
+            else "phase_completed"
+        )
         manifest["finished_at"] = now()
         atomic_write_json(output_root / "run_manifest.json", manifest)
         return 0

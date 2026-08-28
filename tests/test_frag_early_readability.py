@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 
+from scripts.frag_llama_early_readability import wilson_interval
 from src.frag_early_readability import (
     masked_numpy_accuracy,
     path_specs,
@@ -51,3 +52,8 @@ def test_smoke_treats_float32_ulps_as_ties():
     ]
     selected, _ = select_smoke_value(rows, "learning_rate")
     assert selected == 0.03
+
+
+def test_wilson_interval_contains_observed_fraction():
+    lower, upper = wilson_interval(137, 501)
+    assert lower < 137 / 501 < upper
