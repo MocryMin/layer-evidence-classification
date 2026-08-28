@@ -198,6 +198,9 @@ class TestCostAwareCacheHierarchy(unittest.TestCase):
                 self.assertEqual(plan["tier"], "ssd")
                 self.assertEqual(plan["path"], [1, 2, 3, 4])
                 self.assertGreaterEqual(plan["predicted_fractional_saving"], 0.30)
+                before = cache.node(plan["path"])["access_count"]
+                touched = cache.touch(plan["path"])
+                self.assertEqual(touched["access_count"], before + 1)
             finally:
                 cache.close()
 

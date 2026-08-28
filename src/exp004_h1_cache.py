@@ -207,17 +207,24 @@ class GlobalPrefixCache:
         for depth in range(len(path), 0, -1):
             item = self.node(path[:depth])
             if item is not None and item["cache_status"] in {"ssd", "hdd"}:
-                now = time.time_ns()
-                self.connection.execute(
-                    """UPDATE nodes SET last_access_ns=?, access_count=access_count+1
-                       WHERE key=?""",
-                    (now, item["key"]),
-                )
-                self.connection.commit()
-                item["last_access_ns"] = now
-                item["access_count"] += 1
-                return item
+                return self.touch(path[:depth])
         return None
+
+    def touch(self, path: Sequence[int]) -> dict[str, Any]:
+        """Record one selected cache hit without changing payload residency."""
+        item = self.node(path)
+        if item is None or item["cache_status"] not in {"ssd", "hdd"}:
+            raise RuntimeError(f"cannot touch a non-resident prefix: {list(path)}")
+        now = time.time_ns()
+        self.connection.execute(
+            """UPDATE nodes SET last_access_ns=?, access_count=access_count+1
+               WHERE key=?""",
+            (now, item["key"]),
+        )
+        self.connection.commit()
+        item["last_access_ns"] = now
+        item["access_count"] += 1
+        return item
 
     def _resident(self, statuses: tuple[str, ...]) -> list[dict[str, Any]]:
         marks = ",".join("?" for _ in statuses)
