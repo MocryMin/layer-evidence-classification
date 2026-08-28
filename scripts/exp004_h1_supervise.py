@@ -74,7 +74,10 @@ def run() -> int:
     if hard_stop.tzinfo is None or hard_stop.utcoffset() is None:
         raise ValueError("--stop-at must include an explicit UTC offset")
     soft_stop = hard_stop - timedelta(minutes=int(config["runtime"]["reserve_minutes"]))
-    event_path = output_root / "supervisor_events.jsonl"
+    # Keep the supervisor journal beside the artifact.  Creating it inside a
+    # not-yet-existing output root would make the first child mistake the root
+    # for an existing resumable run.
+    event_path = output_root.with_name(f"{output_root.name}-supervisor-events.jsonl")
     child: subprocess.Popen[Any] | None = None
     signal_received: int | None = None
 
