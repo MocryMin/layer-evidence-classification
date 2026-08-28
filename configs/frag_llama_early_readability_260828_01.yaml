@@ -1,0 +1,103 @@
+experiment_id: fragmented_llama_early_readability_260828_01
+status: fragmented_diagnostic_not_hypothesis_confirmation
+scope:
+  question: "Do short Llama paths lack ARC-Easy signal, or does readout conditioning hide it?"
+  official_validation_access: forbidden
+  official_test_access: forbidden
+  relationship_to_exp004: diagnostic_only_no_change_to_frozen_h1
+
+model:
+  name: meta-llama/Llama-3.2-3B-Instruct
+  path: models/Llama-3.2-3B-Instruct
+  dtype: bfloat16
+  attention_implementation: sdpa
+  layers: 28
+  hidden_size: 3072
+
+dataset:
+  path: data/raw/arc_easy/ARC-Easy
+  split_indices: artifacts/EXP-20260827-004-h1-qualification/split_indices.json
+  split_sha256: c5e33a578398304fe200386c0605e8b46e6a300394f91c5b4c7e32e40d52534f
+  fit_size: 1750
+  discover_size: 501
+
+prompt:
+  instruction: "Answer the following multiple-choice question. Reply with only the letter of the correct answer."
+  question_prefix: "Question:"
+  answer_prefix: "Answer:"
+  answer_labels: [A, B, C, D, E]
+  expected_answer_token_ids: [32, 33, 34, 35, 36]
+  padding_side: right
+  max_length_guard: 256
+
+paths:
+  families:
+    single_block: "[l] for l=1..28"
+    canonical_prefix: "[1,2,...,l] for l=1..28"
+  n_paths: 56
+  raw_feature: terminal_last_token_before_final_rmsnorm
+
+variance:
+  primary_split: fit
+  exp002_collapse_threshold_inter_sample_std_mean: 0.001
+  report_splits: [fit, discover]
+  report_transforms: [raw, final_rmsnorm]
+
+audit:
+  canonical_reference_feature_root: artifacts/EXP-20260827-004-h1-qualification/features/canonical
+  prefix_L28_max_abs_tolerance: 0.02
+  prefix_L28_mean_abs_tolerance: 0.001
+
+smoke:
+  seed: 17
+  internal_folds: 5
+  selection_fold: 0
+  representative_paths:
+    single_block: [1, 14, 28]
+    canonical_prefix: [1, 4, 8, 14, 21, 28]
+  adamw:
+    learning_rates: [0.1, 0.03, 0.01, 0.003, 0.001]
+    weight_decay: 0.0
+    max_epochs: 400
+    min_epochs: 50
+    patience: 50
+    min_delta: 0.0001
+    selection: highest_mean_internal_accuracy_then_lower_lr
+    final_epochs: median_best_epoch_at_selected_lr_minimum_50
+  ridge:
+    alphas: [0.000001, 0.0001, 0.01, 1.0, 100.0, 10000.0]
+    solver: lsqr
+    fit_intercept: true
+    selection: highest_mean_internal_accuracy_then_lower_alpha
+
+probes:
+  plain:
+    input: raw
+    architecture: Linear(3072,5,bias=True)
+    optimizer: AdamW
+  ln_plain:
+    input: raw
+    architecture: LayerNorm(3072,affine=True)+Linear(3072,5,bias=True)
+    optimizer: AdamW
+  ridge:
+    input: raw
+    architecture: RidgeClassifier
+  h1_rms_lbfgs:
+    input: frozen_final_rmsnorm
+    architecture: Linear(3072,5,bias=False)
+    optimizer: full_batch_LBFGS
+    l2: 0.3
+    max_iter: 100
+    tolerance_grad: 0.0000001
+  native:
+    input: frozen_final_rmsnorm
+    architecture: frozen_A_to_E_lm_head_rows
+
+runtime:
+  batch_size: 8
+  shard_size: 64
+  seed: 17
+  deterministic: true
+  artifact_root: artifacts/fragmented_llama_early_readability_260828_01
+  validation_accessed: false
+  test_accessed: false
