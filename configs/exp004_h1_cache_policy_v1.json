@@ -1,0 +1,30 @@
+{
+  "version": "cost_aware_gpu_ssd_hdd_v1",
+  "effective_after_completed_candidates": 230,
+  "scientific_search_policy_changed": false,
+  "equivalent_execution_only": true,
+  "minimum_predicted_fractional_saving": 0.30,
+  "gpu_l1_cap_gib": 8,
+  "new_disk_admission": false,
+  "new_disk_admission_reason": "The SSD working set is full and synchronous SSD-to-HDD writeback costs more than the expected reuse saving for the currently shallow paths.",
+  "hdd_to_ssd_promotion_after_qualified_loads": 2,
+  "measured_cost_seconds": {
+    "common": 1.38,
+    "full_intercept": 0.0430876,
+    "full_per_executed_layer": 0.970368,
+    "cached_intercept": 0.7618,
+    "cached_per_residual_layer": 0.937175,
+    "gpu_intercept_estimate": 0.15,
+    "ssd_cold_read": 0.9383006,
+    "hdd_cold_read": 20.5440527
+  },
+  "prompt_length_audit": {
+    "current_padded_tokens_batch8": 311896,
+    "current_tensor_gib": 1.7846832275390625,
+    "compact_instruction_tensor_gib": 1.6687602996826172,
+    "no_instruction_tensor_gib": 1.5657176971435547,
+    "data_only_tensor_gib": 1.5090980529785156,
+    "current_unpadded_tensor_gib": 1.3779088854789734,
+    "prompt_is_frozen_for_current_tranche": true
+  }
+}

@@ -469,6 +469,7 @@ def extract_path_feature_split(
                 or saved["path"] != list(path)
             ):
                 raise RuntimeError(f"resume validation failed for {shard_path}")
+            batch_durations.extend(saved.get("batch_durations_seconds", []))
             n_reused += shard_end - shard_start
             continue
 
@@ -563,6 +564,7 @@ def extract_cached_path_feature_split(
     prefix_cache: Any,
     cached_prefix: dict[str, Any] | None,
     cache_target: Sequence[int] | None,
+    gpu_prefix_cache: Any | None = None,
 ) -> dict[str, Any]:
     """Extract features while reading/writing one global prefix-cache payload."""
     split_root = feature_root / path_id / split_name
@@ -596,22 +598,30 @@ def extract_cached_path_feature_split(
                 or saved["path"] != list(path)
             ):
                 raise RuntimeError(f"resume validation failed for {shard_path}")
+            batch_durations.extend(saved.get("batch_durations_seconds", []))
             n_reused += shard_end - shard_start
             continue
 
         cached_batches = None
         if cached_prefix is not None:
-            cache_shard_path = prefix_cache.shard_path(
-                cached_prefix_path, split_name, shard_start, shard_end
-            )
-            cache_payload = torch.load(cache_shard_path, map_location="cpu", weights_only=False)
-            if (
-                cache_payload["config_hash"] != config_hash
-                or cache_payload["prefix"] != cached_prefix_path
-                or cache_payload["original_indices"] != expected_indices
-            ):
-                raise RuntimeError(f"prefix-cache validation failed for {cache_shard_path}")
-            cached_batches = cache_payload["hidden_batches"]
+            if cached_status == "gpu":
+                if gpu_prefix_cache is None:
+                    raise RuntimeError("GPU cache prefix selected without an L1 cache")
+                cached_batches = gpu_prefix_cache.shard_batches(
+                    cached_prefix_path, split_name, shard_start, shard_end
+                )
+            else:
+                cache_shard_path = prefix_cache.shard_path(
+                    cached_prefix_path, split_name, shard_start, shard_end
+                )
+                cache_payload = torch.load(cache_shard_path, map_location="cpu", weights_only=False)
+                if (
+                    cache_payload["config_hash"] != config_hash
+                    or cache_payload["prefix"] != cached_prefix_path
+                    or cache_payload["original_indices"] != expected_indices
+                ):
+                    raise RuntimeError(f"prefix-cache validation failed for {cache_shard_path}")
+                cached_batches = cache_payload["hidden_batches"]
 
         shard_examples = examples[shard_start:shard_end]
         features: list[torch.Tensor] = []

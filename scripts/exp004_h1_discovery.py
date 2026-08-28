@@ -41,6 +41,12 @@ from src.exp004_h1 import (  # noqa: E402
     verify_answer_tokens,
 )
 from src.exp004_h1_cache import GlobalPrefixCache  # noqa: E402
+from src.exp004_h1_cache_policy import (  # noqa: E402
+    CacheCostModel,
+    GpuPrefixCache,
+    HddPromotionTracker,
+    select_cache_plan,
+)
 from src.exp004_h1_search import (  # noqa: E402
     SOURCE_ORDER,
     edit_distance,
@@ -207,6 +213,7 @@ def summary_document(
     canonical_native: float | None,
     chance: float | None,
     prefix_cache: GlobalPrefixCache | None = None,
+    gpu_prefix_cache: GpuPrefixCache | None = None,
 ) -> dict[str, Any]:
     results = load_results(output_root)
     discovered = [item for item in results if item.get("count_in_prevalence", False)]
@@ -241,6 +248,7 @@ def summary_document(
         "source_good_counts_for_temperature": state.get("source_good_counts"),
         "operational_throttle_skips": state.get("throttle_skips"),
         "prefix_cache": None if prefix_cache is None else prefix_cache.stats(),
+        "gpu_prefix_cache": None if gpu_prefix_cache is None else gpu_prefix_cache.stats(),
         "validation_accessed": False,
         "test_accessed": False,
     }
@@ -292,13 +300,30 @@ def run() -> int:
     repeat_path = canonical_path + [28]
     config_hash = canonical_json_hash(config)
     output_root = resolved(config["runtime"]["artifact_root"]).resolve()
+    operational_policy_path = output_root / "operational_cache_policy.json"
+    if not operational_policy_path.is_file():
+        raise RuntimeError(f"missing operational cache policy: {operational_policy_path}")
+    operational_policy = json.loads(operational_policy_path.read_text(encoding="utf-8"))
+    if operational_policy.get("version") != "cost_aware_gpu_ssd_hdd_v1":
+        raise RuntimeError("unsupported operational cache policy")
     manifest, state = prepare_run(output_root, config, config_hash, deadline, args.resume)
+    manifest["operational_cache_policy"] = {
+        "path": str(operational_policy_path),
+        "sha256": file_sha256(operational_policy_path),
+        "version": operational_policy["version"],
+    }
+    atomic_write_json(output_root / "run_manifest.json", manifest)
     state_path = output_root / "search_state.json"
     journal = EventJournal(output_root / "events.jsonl")
     journal.append("discovery_session_started", pid=os.getpid(), hard_stop=deadline.hard_stop.isoformat())
 
     model = None
     prefix_cache: GlobalPrefixCache | None = None
+    gpu_prefix_cache: GpuPrefixCache | None = None
+    cache_cost_model = CacheCostModel()
+    hdd_promotion = HddPromotionTracker(
+        threshold=int(operational_policy["hdd_to_ssd_promotion_after_qualified_loads"])
+    )
     resident_anchor: float | None = None
     canonical_task: float | None = None
     canonical_native: float | None = None
@@ -362,6 +387,11 @@ def run() -> int:
                 hdd_cap_bytes=int(float(cache_config["hdd_cap_gib"]) * 1024**3),
                 config_hash=config_hash,
             )
+            gpu_prefix_cache = GpuPrefixCache(
+                cap_bytes=int(float(operational_policy["gpu_l1_cap_gib"]) * 1024**3),
+                device=device,
+                config_hash=config_hash,
+            )
 
         def cache_target_for(record: dict[str, Any]) -> list[int] | None:
             if prefix_cache is None:
@@ -370,11 +400,19 @@ def run() -> int:
             if explicit is not None:
                 return list(explicit) or None
             path = list(record["path"])
+            target = None
             if record["source"] in {"S1", "S5"}:
-                return path[:-1] or None
-            if record["source"] in {"S3", "S4"}:
-                return path or None
-            return None
+                target = path[:-1] or None
+            elif record["source"] in {"S3", "S4"}:
+                target = path or None
+            if target is None:
+                return None
+            existing = prefix_cache.node(target)
+            if existing is not None and existing["cache_status"] in {"partial_ssd", "ssd", "hdd"}:
+                return target
+            if not bool(operational_policy["new_disk_admission"]):
+                return None
+            return target
 
         def process(record: dict[str, Any]) -> dict[str, Any]:
             nonlocal canonical_task, canonical_native
@@ -385,11 +423,81 @@ def run() -> int:
             journal.append("path_started", path_id=record["path_id"], source=record["source"], path=record["path"])
             cache_target = cache_target_for(record)
             cached_prefix = None
+            cache_decision = None
+            completed_feature_metadata = None
+            expected_shards = {
+                split_name: [
+                    feature_root / record["path_id"] / split_name
+                    / f"shard_{start:05d}_{min(start + int(config['runtime']['shard_size']), len(split_examples[split_name])):05d}.pt"
+                    for start in range(0, len(split_examples[split_name]), int(config["runtime"]["shard_size"]))
+                ]
+                for split_name in ("fit", "discover")
+            }
+            if all(path.is_file() for paths in expected_shards.values() for path in paths):
+                first_shard = torch.load(
+                    expected_shards["fit"][0], map_location="cpu", weights_only=False
+                )
+                if (
+                    first_shard["config_hash"] == config_hash
+                    and first_shard["path"] == list(record["path"])
+                ):
+                    completed_feature_metadata = {
+                        "cached_prefix": list(first_shard.get("cached_prefix", [])),
+                        "cache_tier": first_shard.get("cache_tier"),
+                        "cache_target": first_shard.get("cache_target"),
+                    }
             if prefix_cache is not None:
                 prefix_cache.register_path(record["path"])
-                if cache_target is not None:
+                if completed_feature_metadata is not None:
+                    cache_target = completed_feature_metadata["cache_target"]
+                    if completed_feature_metadata["cached_prefix"]:
+                        cached_prefix = {
+                            "path": completed_feature_metadata["cached_prefix"],
+                            "cache_status": completed_feature_metadata["cache_tier"],
+                        }
+                    cache_decision = {
+                        "action": "reuse_completed_feature_shards",
+                        **completed_feature_metadata,
+                    }
+                elif cache_target is not None:
                     prefix_cache.prepare_write(cache_target)
-                cached_prefix = prefix_cache.deepest_complete_prefix(record["path"])
+                if completed_feature_metadata is None and gpu_prefix_cache is None:
+                    raise RuntimeError("disk prefix cache requires the configured GPU L1")
+                if completed_feature_metadata is None:
+                    cache_decision = select_cache_plan(
+                        record["path"],
+                        disk_cache=prefix_cache,
+                        gpu_cache=gpu_prefix_cache,
+                        cost_model=cache_cost_model,
+                    )
+                if cache_decision["action"] == "cache":
+                    selected_tier = str(cache_decision["tier"])
+                    selected_path = list(cache_decision["path"])
+                    if selected_tier == "gpu":
+                        cached_prefix = gpu_prefix_cache.touch(selected_path)
+                    else:
+                        prefix_cache.touch(selected_path)
+                        load_t0 = time.monotonic()
+                        cached_prefix = gpu_prefix_cache.load_from_disk(selected_path, prefix_cache)
+                        load_elapsed = time.monotonic() - load_t0
+                        promotion = None
+                        if selected_tier == "hdd":
+                            promotion = hdd_promotion.observe_and_maybe_promote(
+                                selected_path, prefix_cache
+                            )
+                        journal.append(
+                            "gpu_cache_page_loaded",
+                            path=selected_path,
+                            source_tier=selected_tier,
+                            elapsed_seconds=load_elapsed,
+                            promotion=promotion,
+                            gpu_cache=gpu_prefix_cache.stats(),
+                        )
+                journal.append(
+                    "cache_execution_selected",
+                    path_id=record["path_id"],
+                    decision=cache_decision,
+                )
             extraction = []
             for split_name in ("fit", "discover"):
                 extractor = (
@@ -416,6 +524,7 @@ def run() -> int:
                         prefix_cache=prefix_cache,
                         cached_prefix=cached_prefix,
                         cache_target=cache_target,
+                        gpu_prefix_cache=gpu_prefix_cache,
                     )
                 extraction.append(
                     extractor(
@@ -481,6 +590,7 @@ def run() -> int:
                 "cached_prefix": [] if cached_prefix is None else cached_prefix["path"],
                 "cache_tier": None if cached_prefix is None else cached_prefix["cache_status"],
                 "cache_target": cache_target,
+                "cache_decision": cache_decision,
             }
             atomic_write_json(result_path, result)
             journal.append("path_completed", path_id=record["path_id"], source=record["source"], task_accuracy=task_acc, native_accuracy=native_acc, good=good, collapse=collapse)
@@ -596,7 +706,10 @@ def run() -> int:
             state["source_cursor"] = (int(state["source_cursor"]) + 1) % len(SOURCE_ORDER)
             state["inflight"] = None
             account_gpu_time()
-            summary = summary_document(output_root, state, canonical_task, canonical_native, chance, prefix_cache)
+            summary = summary_document(
+                output_root, state, canonical_task, canonical_native, chance,
+                prefix_cache, gpu_prefix_cache,
+            )
             atomic_write_json(output_root / "discovery_summary.json", summary)
             print(
                 f"[{state['completed_search_candidates']:04d}] {result['source']} {result['path_id']} "
@@ -608,7 +721,10 @@ def run() -> int:
 
         account_gpu_time()
         persist_state()
-        summary = summary_document(output_root, state, canonical_task, canonical_native, chance, prefix_cache)
+        summary = summary_document(
+            output_root, state, canonical_task, canonical_native, chance,
+            prefix_cache, gpu_prefix_cache,
+        )
         atomic_write_json(output_root / "discovery_summary.json", summary)
         manifest.update({"status": state["campaign_status"], "finished_at": datetime.now().astimezone().isoformat(timespec="seconds")})
         atomic_write_json(output_root / "run_manifest.json", manifest)
@@ -619,7 +735,10 @@ def run() -> int:
         account_gpu_time()
         state["campaign_status"] = "session_soft_stopped"
         persist_state()
-        summary = summary_document(output_root, state, canonical_task, canonical_native, chance, prefix_cache)
+        summary = summary_document(
+            output_root, state, canonical_task, canonical_native, chance,
+            prefix_cache, gpu_prefix_cache,
+        )
         atomic_write_json(output_root / "discovery_summary.json", summary)
         manifest.update({"status": "session_soft_stopped", "finished_at": datetime.now().astimezone().isoformat(timespec="seconds"), "reason": str(exc)})
         atomic_write_json(output_root / "run_manifest.json", manifest)
@@ -636,6 +755,8 @@ def run() -> int:
     finally:
         if prefix_cache is not None:
             prefix_cache.close()
+        if gpu_prefix_cache is not None:
+            gpu_prefix_cache.entries.clear()
         if model is not None:
             del model
         if torch.cuda.is_available():

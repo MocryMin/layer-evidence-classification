@@ -25,6 +25,11 @@ from src.exp004_h1 import (  # noqa: E402
     valid_choice_mask,
 )
 from src.exp004_h1_cache import GlobalPrefixCache, prefix_key  # noqa: E402
+from src.exp004_h1_cache_policy import (  # noqa: E402
+    CacheCostModel,
+    GpuPrefixCache,
+    select_cache_plan,
+)
 from scripts.exp004_h1_structured_pilot import structured_path_pool  # noqa: E402
 from src.exp004_h1_search import (  # noqa: E402
     SOURCE_ORDER,
@@ -136,6 +141,63 @@ class TestGlobalPrefixCache(unittest.TestCase):
                 statuses = {cache.node([1])["cache_status"], cache.node([1, 2])["cache_status"]}
                 self.assertEqual(statuses, {"ssd", "hdd"})
                 self.assertGreaterEqual(cache.stats()["registered_nodes"], 3)
+            finally:
+                cache.close()
+
+
+class TestCostAwareCacheHierarchy(unittest.TestCase):
+    def test_measured_thirty_percent_depth_gates(self):
+        model = CacheCostModel()
+        self.assertEqual(model.minimum_depth(5, "ssd"), 4)
+        self.assertIsNone(model.minimum_depth(5, "hdd"))
+        self.assertEqual(model.minimum_depth(36, "hdd"), 34)
+        self.assertEqual(model.minimum_depth(5, "gpu"), 2)
+
+    def test_shallow_ssd_prefix_recomputes_but_deep_prefix_pages_into_gpu(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cache = GlobalPrefixCache(
+                index_path=root / "index.sqlite3",
+                ssd_root=root / "ssd",
+                hdd_root=root / "hdd",
+                ssd_cap_bytes=100,
+                hdd_cap_bytes=100,
+                config_hash="test-hash",
+            )
+            gpu = GpuPrefixCache(
+                cap_bytes=100,
+                device=torch.device("cpu"),
+                config_hash="test-hash",
+            )
+            try:
+                cache.prepare_write([1, 2])
+                shallow = cache.shard_path([1, 2], "fit", 0, 1, writing=True)
+                shallow.parent.mkdir(parents=True, exist_ok=True)
+                shallow.write_bytes(b"x")
+                cache.finalize_write([1, 2])
+                plan = select_cache_plan(
+                    [1, 2, 3, 4, 5],
+                    disk_cache=cache,
+                    gpu_cache=gpu,
+                    cost_model=CacheCostModel(),
+                )
+                self.assertEqual(plan["action"], "recompute")
+
+                cache.prepare_write([1, 2, 3, 4])
+                deep = cache.shard_path([1, 2, 3, 4], "fit", 0, 1, writing=True)
+                deep.parent.mkdir(parents=True, exist_ok=True)
+                deep.write_bytes(b"y")
+                cache.finalize_write([1, 2, 3, 4])
+                plan = select_cache_plan(
+                    [1, 2, 3, 4, 5],
+                    disk_cache=cache,
+                    gpu_cache=gpu,
+                    cost_model=CacheCostModel(),
+                )
+                self.assertEqual(plan["action"], "cache")
+                self.assertEqual(plan["tier"], "ssd")
+                self.assertEqual(plan["path"], [1, 2, 3, 4])
+                self.assertGreaterEqual(plan["predicted_fractional_saving"], 0.30)
             finally:
                 cache.close()
 
