@@ -19,6 +19,21 @@ This is a **diagnostic fragmented experiment**, not an EXP-004 H1 hypothesis
 decision. It neither changes the frozen H1 protocol nor accesses the official
 validation/test splits.
 
+## Artifact-path convention
+
+All run-artifact paths in this report are relative to:
+
+`ARTIFACTS_ROOT = <repository>/artifacts/`
+
+For compactness, the report uses:
+
+`FRAG_ROOT = ARTIFACTS_ROOT/fragmented_llama_early_readability_260828_01/`
+
+Thus, for example, `FRAG_ROOT/summary.json` means the repository artifact
+`fragmented_llama_early_readability_260828_01/summary.json`. The frozen YAML
+configuration is source-controlled outside the artifact root and is explicitly
+labelled as a repository-relative path below.
+
 ## Frozen setup
 
 - Model: local Llama-3.2-3B-Instruct, 28 decoder blocks, hidden size 3072,
@@ -197,19 +212,50 @@ absence of generalizable *linear* ARC information after a single block. These
 are diagnostic `D_discover` observations, not final EXP-004 evidence and not a
 claim about all nonlinear information.
 
+## Claim-level artifact index
+
+The paths below are relative to `ARTIFACTS_ROOT`. This index is intended to
+make every main numerical claim recoverable without relying on this prose
+report as the sole record.
+
+| Reported claim or audit target | Root-relative artifact | Relevant content |
+|---|---|---|
+| terminal status, split exclusion, config hash, code state and run timestamps | `fragmented_llama_early_readability_260828_01/run_manifest.json` | terminal manifest and protocol metadata |
+| complete resolved run configuration | `fragmented_llama_early_readability_260828_01/resolved_config.json` | model, data, path, probe and smoke settings |
+| exact `D_fit` and `D_discover` hidden-state caches | `fragmented_llama_early_readability_260828_01/features/fit/shard_*.pt`; `fragmented_llama_early_readability_260828_01/features/discover/shard_*.pt` | cached feature tensors used by every probe |
+| same-process modular-path equivalence | `fragmented_llama_early_readability_260828_01/within_process_path_equivalence.json` | zero feature/logit differences in the within-process audit |
+| cross-run canonical semantic audit | `fragmented_llama_early_readability_260828_01/feature_integrity.json` | prediction agreement and accuracy drift on both splits |
+| no gross variance collapse over 56 paths | `fragmented_llama_early_readability_260828_01/variance_summary.json` | threshold decision and extrema |
+| per-path variance statistics | `fragmented_llama_early_readability_260828_01/variance_stats.json` | all 56 raw and normalized variance rows |
+| deterministic `D_fit` smoke folds | `fragmented_llama_early_readability_260828_01/smoke/folds.json` | fold membership and hashes |
+| Plain and LN-Plain learning-rate/epoch smoke | `fragmented_llama_early_readability_260828_01/smoke/adamw_smoke.json` | all candidate cells and fold metrics |
+| Ridge-alpha smoke | `fragmented_llama_early_readability_260828_01/smoke/ridge_smoke.json` | all alpha cells and fold metrics |
+| selected Plain, LN-Plain and Ridge settings | `fragmented_llama_early_readability_260828_01/smoke/selection.json` | frozen post-smoke selections |
+| isolated-block metrics, L01--L28 | `fragmented_llama_early_readability_260828_01/probe_paths/single_L01.json` through `fragmented_llama_early_readability_260828_01/probe_paths/single_L28.json` | native and four fitted-readout results per path |
+| isolated-block paired predictions | `fragmented_llama_early_readability_260828_01/probe_paths/single_L01_predictions.pt` through `fragmented_llama_early_readability_260828_01/probe_paths/single_L28_predictions.pt` | sample-level predictions used by paired audits |
+| canonical-prefix metrics, L01--L28 | `fragmented_llama_early_readability_260828_01/probe_paths/prefix_L01.json` through `fragmented_llama_early_readability_260828_01/probe_paths/prefix_L28.json` | native and four fitted-readout results per path |
+| canonical-prefix paired predictions | `fragmented_llama_early_readability_260828_01/probe_paths/prefix_L01_predictions.pt` through `fragmented_llama_early_readability_260828_01/probe_paths/prefix_L28_predictions.pt` | sample-level predictions used for McNemar comparisons |
+| aggregate single-block and prefix curves, first-threshold layers and paired tests | `fragmented_llama_early_readability_260828_01/summary.json` | machine-readable aggregate used for this report |
+| machine-generated 56-row table | `fragmented_llama_early_readability_260828_01/report.md` | full per-path human-readable curve |
+| execution journal and checkpoint events | `fragmented_llama_early_readability_260828_01/events.jsonl` | append-only run history |
+| MLflow linkage | `fragmented_llama_early_readability_260828_01/mlflow_run.json` | experiment and run identifiers |
+
 ## Evidence
 
-- Full run artifact:
-  `artifacts/fragmented_llama_early_readability_260828_01/`
-- Frozen config:
+- Full artifact root relative to `ARTIFACTS_ROOT`:
+  `fragmented_llama_early_readability_260828_01/`
+- Frozen config, relative to the repository root rather than
+  `ARTIFACTS_ROOT`:
   `configs/frag_llama_early_readability_260828_01.yaml`
-- Terminal manifest: `run_manifest.json`
+- Terminal manifest: `FRAG_ROOT/run_manifest.json`
 - Same-process implementation equivalence:
-  `within_process_path_equivalence.json`
-- Cross-run canonical semantic audit: `feature_integrity.json`
-- Variance rows and summary: `variance_stats.json`, `variance_summary.json`
-- D_fit-only smoke cells and selection: `smoke/`
-- Per-path metrics and predictions: `probe_paths/`
-- Machine summary and complete 56-row curve: `summary.json`, `report.md`
+  `FRAG_ROOT/within_process_path_equivalence.json`
+- Cross-run canonical semantic audit: `FRAG_ROOT/feature_integrity.json`
+- Variance rows and summary: `FRAG_ROOT/variance_stats.json`,
+  `FRAG_ROOT/variance_summary.json`
+- D_fit-only smoke cells and selection: `FRAG_ROOT/smoke/`
+- Per-path metrics and predictions: `FRAG_ROOT/probe_paths/`
+- Machine summary and complete 56-row curve: `FRAG_ROOT/summary.json`,
+  `FRAG_ROOT/report.md`
 - Implementation commits: `a2d907d`, `81e3709`, `5c40c54`, `004987b`,
   `245f71c`.
