@@ -2,6 +2,16 @@
 
 ## Current state
 
+**EXP-004 H2 operational semantics — SPECIFIED, NOT RUN (2026-08-31).**
+The user-approved implementation details live in
+`configs/exp004_h2_mcts_v1.yaml` and the pure CPU reference implementation
+`src/exp004_h2_mcts.py`; the main EXP-004 document remains at the scientific
+protocol level.  Unit tests cover action indexing/repetition, root and visit
+semantics, UCB, random tuning/control, grid tie-breaking, Wilson lower bounds,
+and canonical/alternative path reporting.  No H2 validation/test data or GPU
+run has been accessed.  Next action: build and benchmark the model-forward
+runner against this frozen interface before enabling validation or test.
+
 **EXP-004 H1 engineering qualification + structured pilot — COMPLETE
 (2026-08-27; non-confirmatory).** A new Llama-3.2-3B-Instruct × ARC-Easy
 runner now supports arbitrary repeatable decoder paths, valid-choice masking,

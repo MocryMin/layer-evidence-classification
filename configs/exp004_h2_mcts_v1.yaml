@@ -1,0 +1,119 @@
+experiment_id: EXP-20260831-004-h2-mcts
+status: specified_not_run
+
+protocol_document:
+  path: 'C:\研究生\实习\learn AI\ReadLLMPaper\ExperimentLogs\RESEARCH-001_layer-evidence-classification\EXP-20260821-004--Fixed Readout Head Imposes an Implicit Admissibility Constraint on Path Searching.md'
+  wsl_path: '/mnt/c/研究生/实习/learn AI/ReadLLMPaper/ExperimentLogs/RESEARCH-001_layer-evidence-classification/EXP-20260821-004--Fixed Readout Head Imposes an Implicit Admissibility Constraint on Path Searching.md'
+  sha256_at_specification: 4b1f5220aaa35b542da03330a793a554d94bf83a651ad2c16bc4e6ecb9968c44
+
+model_and_task:
+  model: deberta-v3-base
+  dataset: clinc150_plus_without_oos
+  n_classes: 150
+  n_transformer_layers: 12
+  canonical_path: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+  prompt: 'Classify the intent: {utterance}'
+  pooling: cls_tail_of_path
+  branch_stack_dtype: float16
+
+canonical_head:
+  policy: reuse_exact_train_only_canonical_head
+  artifact: artifacts/fragmented-experiments/uniform_head_260824_01/heads.npz
+  artifact_sha256: 61e24e994db9d130b767e07642dd51c3ec6984acdf7b19b26c0a5e1b13bceccf
+  provenance_artifact: artifacts/fragmented-experiments/uniform_head_260824_01/results.json
+  provenance_sha256: 8506f26644975834c9efa05af7fb35ce7e762b2aeccd842beae67dc2d29830de
+  weight_key: W_random_1
+  bias_key: b_random_1
+  weight_shape: [768, 150]
+  bias_shape: [150]
+  solver: ridge_closed_form_fp64
+  alpha: 0.000001
+  fit_split: official_train
+  fit_size: 15000
+
+search:
+  simulations_per_sample: 200
+  min_path_length: 1
+  max_path_length: 18
+  explore_probability: 0.1
+  c_grid: [0, 0.01, 0.1, 0.5, 1, 5, 10]
+  lambda_grid: [0, 0.01, 0.1, 0.5, 1, 5, 10]
+  reward:
+    primary: reciprocal_gold_rank
+    binary_control: gold_correctness
+  ucb:
+    N: total_model_layer_count
+    V: current_one_based_simulation_round_for_current_sample
+    root_has_q_or_v: false
+    explored_non_root_initialization:
+      Q: evaluated_leaf_reward
+      v: 1
+    backpropagation: add_leaf_reward_and_one_visit_to_non_root_ancestors
+    tied_maximum: uniform_random
+  expansion:
+    simulation_stops_after_one_new_tree_node: true
+    action_enumeration: deterministic
+    index_convention:
+      start: zero_based_path_position
+      slice: half_open_start_to_start_plus_width
+      recorded_paths_use_one_based_model_layer_ids: true
+    skip:
+      tuple: [skip, start, width]
+      width_values: [1, 2, 3, 4]
+    repeat:
+      tuple: [repeat, start, width, extra_repetitions]
+      width_values: [1, 2, 3, 4]
+      extra_repetition_values: [1, 2, 3, 4]
+      meaning: insert_r_extra_copies_in_addition_to_the_original_block
+    duplicate_resulting_paths:
+      retain_distinct_tree_nodes_and_backpropagation: true
+      reuse_sample_local_path_evaluation: true
+      count_as_simulation: true
+    canonical_identity:
+      any_generated_path_equal_to_canonical_is_canonical: true
+      canonical_is_never_counted_as_an_alternative: true
+
+tuning:
+  split: official_validation
+  canonical_correct_count: 30
+  canonical_wrong_count: 30
+  sample_selection: stratified_uniform_random_without_replacement
+  selection_seed: 17
+  reuse_same_samples_across_all_grids_and_reward_variants: true
+  objective: 0.5_R_short_plus_0.5_R_recov
+  tie_break:
+    - maximum_objective_J
+    - maximum_R_recov
+    - uniform_random
+  binary_reward_control_retunes_c_and_lambda: true
+
+random_control:
+  simulations_per_sample: 200
+  parent_sampling: uniform_over_all_visited_tree_nodes
+  action_sampling: uniform_over_all_legal_action_tuples_for_selected_parent
+  previously_selected_actions_remain_eligible: true
+  duplicate_resulting_paths_count_as_simulations: true
+
+evaluation:
+  split: official_test
+  test_access_requires_completed_preflight_and_explicit_run_authorization: true
+  shortest_correct_alternatives:
+    return_all_tied_shortest_paths: true
+    deduplicate_identical_paths: true
+    no_correct_alternative_representation: empty_list_and_null_length
+  confidence_interval:
+    kind: wilson_score
+    sidedness: two_sided
+    confidence: 0.95
+    report: lower_endpoint
+  acceptance_lower_endpoint:
+    R_recov: 0.10
+    R_short: 0.10
+
+runtime:
+  seed: 17
+  deterministic: true
+  artifact_root: artifacts/EXP-20260831-004-h2-mcts
+  allow_validation: false
+  allow_test: false
+  gpu_run_started: false
