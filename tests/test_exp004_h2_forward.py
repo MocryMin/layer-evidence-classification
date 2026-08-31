@@ -12,6 +12,7 @@ sys.path.insert(0, str(ROOT))
 from src.exp004_h2_forward import (  # noqa: E402
     canonical_cycle_path,
     fixed_head_logits,
+    gold_rank_from_logits,
     h2_simulation_counts,
     longest_cached_prefix,
     runtime_hours,
@@ -40,6 +41,13 @@ class TestH2ForwardHelpers(unittest.TestCase):
         logits = fixed_head_logits(hidden, weight, bias)
         self.assertEqual(logits.dtype, torch.float64)
         torch.testing.assert_close(logits, torch.tensor([[1.5, 3.5]], dtype=torch.float64))
+
+    def test_gold_rank_tie_break_matches_argmax(self):
+        logits = torch.tensor([3.0, 3.0, 2.0, 1.0], dtype=torch.float64)
+        self.assertEqual(gold_rank_from_logits(logits, 0), 1)
+        self.assertEqual(gold_rank_from_logits(logits, 1), 2)
+        self.assertEqual(gold_rank_from_logits(logits, 2), 3)
+        self.assertEqual(int(logits.argmax()), 0)
 
     def test_full_h2_simulation_count(self):
         counts = h2_simulation_counts()

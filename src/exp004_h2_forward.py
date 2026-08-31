@@ -8,7 +8,7 @@ of the operational model and must also be used by H2 search and prefix caches.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Mapping, Sequence
+from typing import Any, Mapping, Sequence
 
 import torch
 
@@ -99,6 +99,106 @@ def fixed_head_logits(
     if weight.ndim != 2 or bias.ndim != 1 or weight.shape[1] != bias.shape[0]:
         raise ValueError("invalid fixed-head shapes")
     return terminal_hidden[:, 0].to(weight.dtype) @ weight + bias
+
+
+def gold_rank_from_logits(logits: torch.Tensor, gold_class: int) -> int:
+    """One-based rank with deterministic lower-class-ID tie-breaking.
+
+    This convention guarantees ``rank == 1`` exactly when PyTorch ``argmax``
+    predicts the gold class, including the otherwise unlikely exact-tie case.
+    """
+    if logits.ndim != 1 or not 0 <= int(gold_class) < logits.numel():
+        raise ValueError("invalid logits or gold class")
+    gold_class = int(gold_class)
+    gold_value = logits[gold_class]
+    greater = (logits > gold_value).sum()
+    tied_lower_id = (logits[:gold_class] == gold_value).sum()
+    return int((greater + tied_lower_id + 1).item())
+
+
+class SamplePathEvaluator:
+    """Exact sample-local path-result and FP16 hidden-prefix cache."""
+
+    def __init__(
+        self,
+        executor: H2ModularDeberta,
+        prepared: PreparedDebertaInput,
+        weight: torch.Tensor,
+        bias: torch.Tensor,
+        gold_class: int,
+    ):
+        self.executor = executor
+        self.prepared = prepared
+        self.weight = weight
+        self.bias = bias
+        self.gold_class = int(gold_class)
+        self.prefix_cache: dict[tuple[int, ...], torch.Tensor] = {}
+        self.result_cache: dict[tuple[int, ...], dict[str, Any]] = {}
+        self.calls = 0
+        self.exact_result_cache_hits = 0
+        self.transformer_blocks_executed = 0
+
+    @torch.inference_mode()
+    def evaluate(self, path: Sequence[int]) -> dict[str, Any]:
+        route = tuple(int(layer) for layer in path)
+        self.calls += 1
+        cached_result = self.result_cache.get(route)
+        if cached_result is not None:
+            self.exact_result_cache_hits += 1
+            return {
+                **cached_result,
+                "exact_result_cache_hit": True,
+                "cached_prefix_length": len(route),
+                "executed_transformer_blocks": 0,
+                "new_prefixes": 0,
+            }
+
+        prefix_length, cached_hidden = longest_cached_prefix(route, self.prefix_cache)
+        hidden, captured = self.executor.forward_from_prefix(
+            self.prepared,
+            route,
+            cached_prefix_length=prefix_length,
+            cached_hidden=cached_hidden,
+            capture_prefixes=True,
+        )
+        new_prefixes = 0
+        for prefix, state in captured.items():
+            if prefix not in self.prefix_cache:
+                self.prefix_cache[prefix] = state
+                new_prefixes += 1
+        executed = len(route) - prefix_length
+        self.transformer_blocks_executed += executed
+        logits = fixed_head_logits(hidden, self.weight, self.bias)[0]
+        predicted = int(logits.argmax().item())
+        rank = gold_rank_from_logits(logits, self.gold_class)
+        base = {
+            "path": list(route),
+            "predicted_class": predicted,
+            "gold_class": self.gold_class,
+            "correct": predicted == self.gold_class,
+            "gold_rank": rank,
+        }
+        self.result_cache[route] = base
+        return {
+            **base,
+            "exact_result_cache_hit": False,
+            "cached_prefix_length": prefix_length,
+            "executed_transformer_blocks": executed,
+            "new_prefixes": new_prefixes,
+        }
+
+    def summary(self) -> dict[str, Any]:
+        prefix_bytes = sum(
+            state.numel() * state.element_size() for state in self.prefix_cache.values()
+        )
+        return {
+            "evaluation_calls": self.calls,
+            "unique_paths": len(self.result_cache),
+            "exact_result_cache_hits": self.exact_result_cache_hits,
+            "transformer_blocks_executed": self.transformer_blocks_executed,
+            "prefix_cache_entries": len(self.prefix_cache),
+            "prefix_cache_bytes": prefix_bytes,
+        }
 
 
 def longest_cached_prefix(
