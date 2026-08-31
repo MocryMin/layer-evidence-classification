@@ -2,6 +2,19 @@
 
 ## Current state
 
+**EXP-004 H2 throughput preflight — COMPLETE (2026-08-31; train-only,
+non-confirmatory).** The exact FP32-block/FP16-boundary executor is bit-exact
+with the canonical-head source stack. Across 3,876,000 planned simulations,
+sample-local exact prefix reuse gives an action-weighted estimate of 7.41
+GPU-hours versus 12.46 hours for length-12 full recomputation (40.5% saving).
+With a 25% latency/orchestration reserve, allocate 10 GPU-hours in resumable
+components. Raw artifact:
+`artifacts/EXP-20260831-004-h2-throughput/{results,complexity_analysis}.json`;
+report: `agent-BuildReports/experiments/EXP-20260831-004-h2-throughput.md`;
+MLflow run `91b55dc78bf14b9f8ccca9e94582e0e5`. No validation/test was read.
+Next action: implement the resumable H2 runner with a sample-local GPU FP16
+prefix-state cache, then do a validation-only integration pilot.
+
 **EXP-004 H2 operational semantics — SPECIFIED, NOT RUN (2026-08-31).**
 The user-approved implementation details live in
 `configs/exp004_h2_mcts_v1.yaml` and the pure CPU reference implementation
