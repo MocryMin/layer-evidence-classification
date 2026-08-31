@@ -61,12 +61,22 @@ class TestH2FullRunnerHelpers(unittest.TestCase):
         self.assertNotEqual(first, random_control)
 
     def test_full_config_binds_frozen_semantics_and_gates_test(self):
-        config = yaml.safe_load((ROOT / "configs/exp004_h2_full_v1.yaml").read_text())
+        config = yaml.safe_load((ROOT / "configs/exp004_h2_full_v2.yaml").read_text())
         semantics = ROOT / config["semantics_config"]
         self.assertEqual(hashlib.sha256(semantics.read_bytes()).hexdigest(), config["semantics_config_sha256"])
         self.assertTrue(config["authorization"]["allow_validation"])
         self.assertTrue(config["authorization"]["allow_test_after_tuning_complete"])
         self.assertEqual(config["dataset"]["padding"], "fixed_to_each_split_observed_max_length")
+        audit = config["dataset"]["canonical_validation_audit"]
+        self.assertEqual(config["dataset"]["canonical_scan_batch_size"], 1)
+        self.assertEqual(audit["expected_operational_correct"], 2704)
+        self.assertEqual(audit["source_reference"]["expected_correct"], 2701)
+        self.assertEqual(audit["source_reference"]["expected_operational_delta"], 3)
+        numerical_audit = ROOT / audit["numerical_audit"]["artifact"]
+        self.assertEqual(
+            hashlib.sha256(numerical_audit.read_bytes()).hexdigest(),
+            audit["numerical_audit"]["sha256"],
+        )
 
 
 if __name__ == "__main__":

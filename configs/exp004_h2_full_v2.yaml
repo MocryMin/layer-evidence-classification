@@ -1,0 +1,73 @@
+experiment_id: EXP-20260831-004-h2-mcts-v2
+status: official_full_run_authorized_after_numerical_audit
+semantics_config: configs/exp004_h2_mcts_v1.yaml
+semantics_config_sha256: 7e6b0d0b8c4b1bfdce995e364c65ee650a2267256af4d0bebcb778da21fd389c
+authorization:
+  source: user_message
+  date: '2026-08-31'
+  instruction: start_full
+  allow_validation: true
+  allow_test_after_tuning_complete: true
+
+model:
+  path: models/deberta-v3-base
+  load_dtype: float32
+  compute_dtype: float32
+  branch_boundary_dtype: float16
+  deterministic: true
+  float32_matmul_precision: highest
+
+dataset:
+  root: data/raw/clinc_oos/plus
+  validation_file: validation-00000-of-00001.parquet
+  test_file: test-00000-of-00001.parquet
+  drop_intent_id: 42
+  prompt: 'Classify the intent: {utterance}'
+  padding: fixed_to_each_split_observed_max_length
+  canonical_scan_batch_size: 1
+  canonical_validation_audit:
+    operational_policy: samplewise_batch_one_same_as_h2_path_search
+    expected_operational_correct: 2704
+    expected_total: 3000
+    source_reference:
+      expected_correct: 2701
+      batch_size: 512
+      expected_operational_delta: 3
+      artifact: artifacts/fragmented-experiments/uniform_head_260824_01/results.json
+    numerical_audit:
+      artifact: artifacts/EXP-20260831-004-h2-numerical-audit/results.json
+      sha256: 94ddb8e9579448b9965c7d4d8760ee0be611e24476c75b6b1207666677112f54
+      validation_only: true
+      test_accessed: false
+
+search_runtime:
+  seed: 17
+  common_random_numbers_across_grids: true
+  gold_rank_tie_break: higher_logit_then_lower_class_id
+  sample_local_exact_result_cache: true
+  sample_local_all_prefix_fp16_gpu_cache: true
+  tuning_checkpoint: one_complete_grid
+  test_shard_size: 20
+  trace_every_simulation: true
+  stop_at: null
+  gpu_empty_cache_between_grids_or_shards: true
+
+preflight:
+  validation_samples: 3
+  simulations_per_search: 200
+  c: 1.0
+  lambda: 1.0
+  run_primary_mcts: true
+  run_random_control: true
+
+artifacts:
+  root: artifacts/EXP-20260831-004-h2-mcts-v2
+  manifest: run_manifest.json
+  tuning_indices: tuning_indices.json
+  tuning_selection: tuning_selection.json
+  test_access_gate: test_access_gate.json
+  final_summary: final_summary.json
+
+mlflow:
+  tracking_uri: sqlite:///mlruns.db
+  experiment: EXP-004-readability-qualification

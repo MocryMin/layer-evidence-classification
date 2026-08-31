@@ -459,13 +459,22 @@ def ensure_tuning_indices(
     atomic_write_json(scan_path, scan)
     audit = config["dataset"]["canonical_validation_audit"]
     observed_correct = sum(row["correct"] for row in scan)
-    if observed_correct != int(audit["expected_correct"]) or len(scan) != int(
-        audit["expected_total"]
-    ):
+    if observed_correct != int(audit["expected_operational_correct"]) or len(
+        scan
+    ) != int(audit["expected_total"]):
         raise RuntimeError(
             "canonical validation audit failed: "
             f"{observed_correct}/{len(scan)} != "
-            f"{audit['expected_correct']}/{audit['expected_total']}"
+            f"{audit['expected_operational_correct']}/{audit['expected_total']} "
+            f"under {audit['operational_policy']}"
+        )
+    source_reference = audit["source_reference"]
+    observed_source_delta = observed_correct - int(source_reference["expected_correct"])
+    if observed_source_delta != int(source_reference["expected_operational_delta"]):
+        raise RuntimeError(
+            "canonical source-reference delta changed: "
+            f"{observed_source_delta} != "
+            f"{source_reference['expected_operational_delta']}"
         )
     selected = random_tuning_indices(
         [row["correct"] for row in scan],
@@ -477,6 +486,9 @@ def ensure_tuning_indices(
         "selection_seed": int(semantics["tuning"]["selection_seed"]),
         "canonical_correct_scan_count": observed_correct,
         "canonical_wrong_scan_count": sum(not row["correct"] for row in scan),
+        "canonical_source_reference_correct": int(source_reference["expected_correct"]),
+        "canonical_operational_minus_source_correct": observed_source_delta,
+        "canonical_operational_policy": audit["operational_policy"],
         "scan_path": str(scan_path.relative_to(ROOT)),
         "fixed_padding_length": pad_length,
     }
@@ -852,7 +864,7 @@ def run_test(selection, *, config, artifact_root, run_id, tracking_uri, **kwargs
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", default=str(ROOT / "configs/exp004_h2_full_v1.yaml"))
+    parser.add_argument("--config", default=str(ROOT / "configs/exp004_h2_full_v2.yaml"))
     parser.add_argument("--stage", choices=["preflight", "tuning", "test", "all"], default="all")
     parser.add_argument("--stop-at", default=None, help="timezone-aware ISO timestamp")
     args = parser.parse_args()
@@ -862,6 +874,12 @@ def main() -> None:
     semantics = yaml.safe_load(semantics_path.read_text(encoding="utf-8"))
     if sha256(semantics_path) != config["semantics_config_sha256"]:
         raise RuntimeError("semantics config hash changed")
+    numerical_audit = config["dataset"]["canonical_validation_audit"][
+        "numerical_audit"
+    ]
+    numerical_audit_path = ROOT / numerical_audit["artifact"]
+    if sha256(numerical_audit_path) != numerical_audit["sha256"]:
+        raise RuntimeError("canonical numerical-audit artifact hash changed")
     if not config["authorization"]["allow_validation"]:
         raise RuntimeError("validation gate is closed")
 
