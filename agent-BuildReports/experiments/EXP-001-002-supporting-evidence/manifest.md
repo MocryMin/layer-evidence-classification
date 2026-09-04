@@ -1,6 +1,6 @@
-# EXP-001 / EXP-002 Freeze Manifest
+# EXP-001 / EXP-002 Evidence Manifest
 
-- **Freeze tag:** `exp-001-002-freeze-20260810`
+- **Evidence tag:** `exp-001-002-evidence-v1`
 - **Generated:** 2026-08-10T19:37:39
 - **Git remote:** `git@github.com:MocryMin/layer-evidence-classification.git`
 - **HF dataset URI:** `PENDING (filled after upload, step 9)`
@@ -10,7 +10,7 @@
 
 | Location | Contents |
 |---|---|
-| **GitHub** (this repo, at the freeze tag) | code (`src/`, `scripts/`), configs, tests, requirements, experiment reports (`agent-BuildReports/experiments/`), this manifest + small summaries (`agent-BuildReports/freeze-20260810/`), PROJECT_STATUS/RESOURCES/AGENT_PROTOCOL |
+| **GitHub** (this repo, at the evidence tag) | code (`src/`, `scripts/`), configs, tests, requirements, experiment reports (`agent-BuildReports/experiments/`), this manifest + small summaries (`agent-BuildReports/experiments/EXP-001-002-supporting-evidence/`), PROJECT_STATUS/RESOURCES/AGENT_PROTOCOL |
 | **HuggingFace** (private dataset, see URI above) | 38 artifact result files, FT-backbone best checkpoint (8 files), frozen mlruns.db snapshot |
 | **Not uploaded** (rebuildable) | 12 CLS safetensors caches (2 GB) - rebuild via `scripts/cache_hidden.py` |
 
@@ -99,7 +99,7 @@
 
 ## Reproduction
 
-- Code + config + reports: `git clone` this repo, checkout tag `exp-001-002-freeze-20260810`.
+- Code + config + reports: `git clone` this repo, checkout tag `exp-001-002-evidence-v1`.
 - Artifacts + mlruns snapshot: download from the HF dataset URI above (private).
 - CLS caches (not uploaded): rebuild with `python -u scripts/cache_hidden.py` (frozen `microsoft/deberta-v3-base`, CLS pooling, layers 1..12, fp16 safetensors). Verify against the `cache_manifest.json` sha256 listed in the HF upload.
 - FT backbone: either download from HF (`best_checkpoints/deberta-v3-base-clinc150-ft/`) or re-run `src/finetune.py`.
