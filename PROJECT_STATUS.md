@@ -41,9 +41,14 @@ rewritten.
 ## Record integrity
 
 - Local Git `main` contains the finished EXP-004 implementation and reports.
-- The existing GitHub repository and historical HF freeze were still private at
-  this audit point; public release must not be claimed until anonymous access is
-  verified.
+- The reviewed GitHub evidence layer is public at source tag
+  `exp-001-004-evidence-v1` (commit
+  `6081e8ecf316400e3b69e820be0c557c7457a763`). Anonymous access was verified
+  on 2026-09-04.
+- The curated HF dataset `MocryMin/lec-exp-001-004-evidence` is public at
+  revision `exp-001-004-evidence-v1` (HF commit
+  `7aa5ed568738ad006808830387b85e5a9eebb50e`). Anonymous access was verified
+  for the dataset card, artifact root, manifest, and a representative artifact.
 - The local MLflow database contained 19 historical runs at the start of this
   audit. Three abandoned early runs have stale `RUNNING` state. They are retained
   as historical records and excluded from canonical-run exports rather than
@@ -59,7 +64,7 @@ rewritten.
 
 1. Freeze the first 2--4 page LaTeX research proposal using the claim IDs in
    `docs/EVIDENCE_INDEX.md`.
-2. Publish and anonymously verify the reviewed GitHub evidence layer.
-3. Publish the curated HF evidence bundle generated from `release/`.
-4. Begin first-round supervisor outreach using the RP as the entry point and
+2. Begin first-round supervisor outreach using the RP as the entry point and
    this repository as optional supporting material.
+3. Keep future experiments under new experiment IDs and publish them as new
+   versioned evidence releases rather than moving the EXP-001--004 anchors.

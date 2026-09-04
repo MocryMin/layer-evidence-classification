@@ -2,6 +2,8 @@ import hashlib
 import fnmatch
 import json
 import re
+import subprocess
+from functools import lru_cache
 from pathlib import Path
 
 
@@ -15,6 +17,33 @@ def _json(path: Path):
 
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+@lru_cache(maxsize=None)
+def _tracked_paths_at_revision(revision: str) -> frozenset[str]:
+    result = subprocess.run(
+        ["git", "ls-tree", "-r", "--name-only", "-z", revision],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+    )
+    return frozenset(
+        path.decode("utf-8")
+        for path in result.stdout.split(b"\0")
+        if path
+    )
+
+
+def _release_source_bytes(source: str, revision: str) -> bytes:
+    if source not in _tracked_paths_at_revision(revision):
+        return (ROOT / source).read_bytes()
+    result = subprocess.run(
+        ["git", "show", f"{revision}:{source}"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+    )
+    return result.stdout
 
 
 def _expanded_release_items(spec):
@@ -69,7 +98,7 @@ def test_author_log_snapshots_match_source_manifest():
         assert record["byte_identical_to_source"] is True
 
 
-def test_tracked_release_manifest_matches_selected_sources():
+def test_tracked_release_manifest_matches_tagged_sources():
     spec = _json(SPEC_PATH)
     manifest = _json(
         ROOT
@@ -90,9 +119,9 @@ def test_tracked_release_manifest_matches_selected_sources():
     }
     assert set(by_source) == set(expected)
     for source, entry in by_source.items():
-        path = ROOT / source
-        assert entry["bytes"] == path.stat().st_size
-        assert entry["sha256"] == _sha256(path)
+        source_bytes = _release_source_bytes(source, spec["source_revision"])
+        assert entry["bytes"] == len(source_bytes)
+        assert entry["sha256"] == hashlib.sha256(source_bytes).hexdigest()
         assert entry["release_path"] == expected[source]
         assert entry["hf_uri"].endswith("/" + entry["release_path"])
         assert entry["web_url"].startswith(

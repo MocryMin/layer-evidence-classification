@@ -5,6 +5,20 @@ evidence, readout validity, and alternative layer paths in pretrained language
 models. The project is being developed as preliminary work for a PhD research
 proposal; it is a research record rather than a finished paper.
 
+## Public evidence release
+
+The reviewed EXP-001--004 evidence layer is public at two fixed entry points:
+
+- [GitHub source revision](https://github.com/MocryMin/layer-evidence-classification/tree/exp-001-004-evidence-v1)
+  — code, protocols, reports, and evidence navigation;
+- [Hugging Face evidence dataset](https://huggingface.co/datasets/MocryMin/lec-exp-001-004-evidence/tree/exp-001-004-evidence-v1)
+  — the curated machine-readable evidence package and selected artifacts.
+
+The stable artifact root and the exact log-pointer resolution rule are defined
+in [Public artifact paths](docs/PUBLIC_ARTIFACTS.md). The source tag and HF
+revision are immutable release anchors; later updates to `main` do not change
+the evidence package they identify.
+
 ## Research question
 
 When execution depth or layer order is allowed to change, two questions must be

@@ -231,6 +231,17 @@ def git_is_dirty() -> bool:
     return bool(result.stdout.strip())
 
 
+def git_resolve_commit(revision: str) -> str:
+    result = subprocess.run(
+        ["git", "rev-parse", f"{revision}^{{commit}}"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return result.stdout.strip()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--spec", type=Path, default=DEFAULT_SPEC)
@@ -268,6 +279,21 @@ def main() -> None:
     if spec["schema_version"] != 1:
         raise SystemExit("unsupported release spec schema")
 
+    dirty_before_build = git_is_dirty()
+    if dirty_before_build:
+        raise SystemExit(
+            "release builds require a clean worktree; commit or remove "
+            "tracked changes first"
+        )
+    head_commit = git_resolve_commit("HEAD")
+    source_commit = git_resolve_commit(spec["source_revision"])
+    if head_commit != source_commit:
+        raise SystemExit(
+            "HEAD does not match source_revision: "
+            f"HEAD={head_commit}, {spec['source_revision']}={source_commit}. "
+            "Build from a dedicated checkout of the tagged source revision."
+        )
+
     bundle_id = spec["bundle_id"]
     output_dir = (
         args.output_dir.expanduser().resolve()
@@ -294,8 +320,6 @@ def main() -> None:
         "mlflow/selected_runs.json",
     }
     seen_release_paths = set(reserved_release_paths)
-    dirty_before_build = git_is_dirty()
-
     expanded_items = list(spec["files"])
     for file_set in spec.get("file_sets", []):
         for key in (

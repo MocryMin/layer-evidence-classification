@@ -35,6 +35,12 @@ author logs and is checked by the test suite.
 The output directory must not already exist. This prevents an old or manually
 modified file from being silently mixed into a new release.
 
+The builder also requires a clean checkout whose `HEAD` resolves to the
+specification's `source_revision`. To reconstruct this release after `main` has
+moved forward, first check out `exp-001-004-evidence-v1` in a dedicated
+worktree; the release must never be rebuilt from newer tracked files while
+retaining the old version label.
+
 ## Publication gate
 
 Do not label the release public until all of the following are true:
@@ -45,7 +51,24 @@ Do not label the release public until all of the following are true:
 4. Git tag and commit are pushed;
 5. GitHub repository visibility is public;
 6. the exact built directory is uploaded to HF;
-7. GitHub, HF, manifest, and RP PDF are opened in an unsigned browser session.
+7. GitHub, HF, the manifest, and a representative artifact are opened in an
+   unsigned browser session.
+
+The RP PDF has its own publication gate and should be anonymously verified when
+it is added; it is not part of this evidence-only release.
 
 The GitHub visibility change and HF upload are external publication actions.
 They should be performed only after the local release candidate is complete.
+
+## Publication record
+
+The EXP-001--004 evidence release was published and anonymously verified on
+2026-09-04:
+
+- GitHub source tag: `exp-001-004-evidence-v1`, commit
+  `6081e8ecf316400e3b69e820be0c557c7457a763`;
+- HF revision: `exp-001-004-evidence-v1`, commit
+  `7aa5ed568738ad006808830387b85e5a9eebb50e`;
+- manifest entries: 4,132;
+- physical files: 4,134;
+- selected payload: 115,690,703 bytes.
