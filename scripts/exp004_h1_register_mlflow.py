@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Register completed EXP-004 H1 qualification artifacts in local MLflow."""
+"""Register completed EXP-004 H1 qualification and discovery artifacts."""
 from __future__ import annotations
 
 import json
@@ -29,13 +29,15 @@ def register(
     params: dict[str, Any],
     metrics: dict[str, float],
     artifact_paths: list[Path],
+    tags: dict[str, str] | None = None,
 ) -> str:
     record_path = artifact_root / "mlflow_run.json"
     if record_path.exists():
         return read_json(record_path)["run_id"]
     with mlflow.start_run(run_name=run_name) as active:
         mlflow.set_tags(
-            {
+            tags
+            or {
                 "experiment_phase": "engineering_qualification",
                 "official_hypothesis_evidence": "false",
                 "validation_accessed": "false",
@@ -177,7 +179,135 @@ def main() -> None:
             ROOT / "configs/exp004_h1_structured_pilot.yaml",
         ],
     )
-    print(json.dumps({"qualification": q_run, "head": h_run, "pilot": p_run}, indent=2))
+
+    legacy = ROOT / "artifacts/EXP-20260827-004-h1-discovery"
+    legacy_manifest = read_json(legacy / "run_manifest.json")
+    legacy_summary = read_json(legacy / "discovery_summary.json")
+    legacy_metrics: dict[str, float] = {
+        "n_discovered_candidates": legacy_summary["n_discovered_candidates"],
+        "n_good": legacy_summary["n_good"],
+        "n_readability_collapse_among_good": legacy_summary[
+            "n_readability_collapse_among_good"
+        ],
+        "p_gap_among_good": legacy_summary["p_gap_among_good"],
+        "canonical_task_accuracy_discover": legacy_summary[
+            "canonical_task_accuracy_discover"
+        ],
+        "canonical_native_accuracy_discover": legacy_summary[
+            "canonical_native_accuracy_discover"
+        ],
+        "gpu_hours_used": legacy_summary["gpu_hours_used"],
+    }
+    for source, values in legacy_summary["by_source"].items():
+        legacy_metrics[f"{source}_n"] = values["n"]
+        legacy_metrics[f"{source}_n_good"] = values["n_good"]
+        legacy_metrics[f"{source}_n_gap"] = values["n_gap_among_good"]
+        if values["p_gap_among_good"] is not None:
+            legacy_metrics[f"{source}_p_gap"] = values["p_gap_among_good"]
+    legacy_run = register(
+        "EXP-20260827-004-h1-discovery",
+        legacy,
+        {
+            "git_commit_at_freeze": legacy_manifest["git_at_freeze"]["commit"],
+            "config_hash": legacy_manifest["config_hash"],
+            "protocol_status": legacy_manifest["protocol_status"],
+            "search_semantics": "legacy_fixed_temperature_mixture",
+            "terminal_status": legacy_manifest["status"],
+        },
+        legacy_metrics,
+        [
+            legacy / "run_manifest.json",
+            legacy / "resolved_config.yaml.json",
+            legacy / "discovery_summary.json",
+            legacy / "search_state.json",
+            legacy / "results/repeat_L28.json",
+            legacy / "results/p_9386832e3dab5b0b.json",
+            ROOT / "user_exp_plans/EXP-20260827-004-h1-frozen-protocol.md",
+            ROOT
+            / "agent-BuildReports/experiments/"
+            "EXP-20260828-004-H1-agent-report.md",
+        ],
+        tags={
+            "experiment_phase": "train_discovery",
+            "official_hypothesis_evidence": "train_discovery_only",
+            "evidence_maturity": "discovery_preliminary",
+            "search_semantics": "legacy_fixed_temperature_mixture",
+            "validation_accessed": "false",
+            "test_accessed": "false",
+        },
+    )
+
+    sourcewise = ROOT / "artifacts/EXP-20260828-004-h1-sourcewise-rerun"
+    sourcewise_manifest = read_json(sourcewise / "run_manifest.json")
+    sourcewise_summary = read_json(sourcewise / "discovery_summary.json")
+    sourcewise_metrics: dict[str, float] = {
+        "n_discovered_candidates": sourcewise_summary["n_discovered_candidates"],
+        "n_good": sourcewise_summary["n_good"],
+        "n_readability_collapse_among_good": sourcewise_summary[
+            "n_readability_collapse_among_good"
+        ],
+        "p_gap_among_good": sourcewise_summary["p_gap_among_good"],
+        "canonical_task_accuracy_discover": sourcewise_summary[
+            "canonical_task_accuracy_discover"
+        ],
+        "canonical_native_accuracy_discover": sourcewise_summary[
+            "canonical_native_accuracy_discover"
+        ],
+        "gpu_hours_used": sourcewise_summary["gpu_hours_used"],
+        "gpu_cache_hits": sourcewise_summary["gpu_prefix_cache"]["hits"],
+        "gpu_cache_loads": sourcewise_summary["gpu_prefix_cache"]["loads"],
+    }
+    for source, values in sourcewise_summary["by_source"].items():
+        sourcewise_metrics[f"{source}_n"] = values["n"]
+        sourcewise_metrics[f"{source}_n_good"] = values["n_good"]
+        sourcewise_metrics[f"{source}_n_gap"] = values["n_gap_among_good"]
+        if values["p_gap_among_good"] is not None:
+            sourcewise_metrics[f"{source}_p_gap"] = values["p_gap_among_good"]
+    sourcewise_run = register(
+        "EXP-20260828-004-h1-sourcewise-rerun",
+        sourcewise,
+        {
+            "git_commit_at_freeze": sourcewise_manifest["git_at_freeze"]["commit"],
+            "config_hash": sourcewise_manifest["config_hash"],
+            "protocol_status": sourcewise_manifest["protocol_status"],
+            "search_semantics": "corrected_sourcewise_temperature",
+            "terminal_status": sourcewise_manifest["status"],
+        },
+        sourcewise_metrics,
+        [
+            sourcewise / "run_manifest.json",
+            sourcewise / "resolved_config.yaml.json",
+            sourcewise / "discovery_summary.json",
+            sourcewise / "search_state.json",
+            sourcewise / "operational_cache_policy.json",
+            sourcewise / "results/repeat_L28.json",
+            sourcewise / "results/p_84ec26e17f1a4b06.json",
+            ROOT / "user_exp_plans/EXP-20260828-004-h1-sourcewise-rerun-protocol.md",
+            ROOT
+            / "agent-BuildReports/experiments/"
+            "EXP-20260828-004-H1-agent-report.md",
+        ],
+        tags={
+            "experiment_phase": "train_discovery",
+            "official_hypothesis_evidence": "train_discovery_only",
+            "evidence_maturity": "discovery_preliminary",
+            "search_semantics": "corrected_sourcewise_temperature",
+            "validation_accessed": "false",
+            "test_accessed": "false",
+        },
+    )
+    print(
+        json.dumps(
+            {
+                "qualification": q_run,
+                "head": h_run,
+                "pilot": p_run,
+                "legacy_discovery": legacy_run,
+                "sourcewise_discovery": sourcewise_run,
+            },
+            indent=2,
+        )
+    )
 
 
 if __name__ == "__main__":

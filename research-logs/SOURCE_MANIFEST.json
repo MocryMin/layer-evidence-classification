@@ -1,0 +1,46 @@
+{
+  "policy": "Byte-preserving snapshots; current interpretation is controlled by docs/EVIDENCE_INDEX.md and corrections by docs/ERRATA.md.",
+  "records": [
+    {
+      "byte_identical_to_source": true,
+      "bytes": 18269,
+      "public_path": "research-logs/EXP-001.md",
+      "record_type": "formal_experiment_log",
+      "sha256": "922ec7c42b4510d91d19466593ce0c52eb4e64ea78072c60a8e965ebad908000",
+      "source_basename": "EXP-20260729-001--Verifying Intermediate-LayerRecoverability in Fine-Grained Intent Classification.md"
+    },
+    {
+      "byte_identical_to_source": true,
+      "bytes": 35569,
+      "public_path": "research-logs/EXP-002.md",
+      "record_type": "formal_experiment_log",
+      "sha256": "d4cf42a6144b21b489a9ee8587b599d0aef9372d7184c13bd1331ec1dc29d22a",
+      "source_basename": "EXP-20260730-002--Diagnosing Linear-probe mid-layer variance collapse on DeBERTa-v3-base &CLINC150 (from EXP-001).md"
+    },
+    {
+      "byte_identical_to_source": true,
+      "bytes": 21584,
+      "public_path": "research-logs/EXP-003.md",
+      "record_type": "formal_experiment_log",
+      "sha256": "cc7f29bba0d8dd53e7682b372450ef30a5b39f31f220d56485bd1e043b25b18e",
+      "source_basename": "EXP-20260810-003-Restore EXP-001 under a probe protocol that EXP-002 has shown to be valid.md"
+    },
+    {
+      "byte_identical_to_source": true,
+      "bytes": 32216,
+      "public_path": "research-logs/EXP-004.md",
+      "record_type": "formal_experiment_log",
+      "sha256": "62a9693ef679d407523292b2f0194ace8c30230d59a573ce01542744631d9bd8",
+      "source_basename": "EXP-20260821-004--Fixed Readout Head Imposes an Implicit Admissibility Constraint on Path Searching.md"
+    },
+    {
+      "byte_identical_to_source": true,
+      "bytes": 25203,
+      "public_path": "research-logs/POST-EXP-003-DIRECTION-HISTORY.md",
+      "record_type": "research_direction_history",
+      "sha256": "00f83d9f9467bb415404f9c9b120bcdad93a70df8d7a9fbf6b1fcee656b8b832",
+      "source_basename": "Post-EXP-003--DirectionResearch-History&Prospects---EXP-004~006Plan.md"
+    }
+  ],
+  "schema_version": 1
+}

@@ -277,3 +277,66 @@ point is independent; no accept-protocol or hypothesis test is required.
 - Artifacts go to `artifacts/fragmented-experiments/<name>_<YYMMDD>_<NN>/`
   (same naming as the report), gitignored.
 - Record config, results, and enough evidence to reproduce each point.
+
+---
+
+## 10. Public Evidence Closure
+
+When an experiment cycle is closed for an RP, paper, or external review,
+prepare a reviewer-facing evidence layer without weakening the private raw-data
+archive.
+
+The authoritative navigation and claim boundaries live in:
+
+```text
+docs/EVIDENCE_INDEX.md
+docs/REPRODUCIBILITY.md
+docs/ARTIFACT_REGISTRY.md
+docs/ERRATA.md
+```
+
+Each RP claim must use a stable claim ID from `docs/EVIDENCE_INDEX.md`. Do not
+promote exploratory, discovery-split, or fragmented evidence to confirmatory
+status in prose. If a manual log and an objective agent report use different
+language, preserve both originals and record the reconciliation in
+`docs/ERRATA.md`.
+
+Before a public release:
+
+1. sync the selected manual logs with `scripts/sync_research_logs.py` and verify
+   their recorded source hashes;
+2. ensure every promoted claim points to a finished canonical MLflow run, or
+   state explicitly why the evidence is not represented by such a run;
+3. build only the allowlisted bundle defined by
+   `release/public_bundle_spec.json` using
+   `scripts/build_public_evidence.py`;
+4. run the evidence tests and checksum verification;
+5. scan the current tree and Git history for credentials;
+6. inspect the exact Git and Hugging Face payloads, their visibility, and their
+   licences;
+7. verify public links from a logged-out session after publication.
+
+GitHub is the public documentation/code/provenance layer. A curated Hugging
+Face dataset is the compact evidence layer. Raw hidden states, model weights,
+downloaded datasets, cache trees, local MLflow databases, large traces, and
+other machine-specific artifacts remain local/private unless a separate
+reviewed release explicitly includes them.
+
+Public release directories and revisions must use stable experiment IDs and
+evidence roles. Do not expose temporary lifecycle words such as `freeze`,
+`final-final`, or operator/session names in a current public folder or release
+name. Scientific terms such as a frozen backbone or frozen selection rule may
+remain in prose, code, configuration, or historical filenames when they carry
+actual experimental meaning.
+
+Every formal experiment log must declare one repository-relative artifact root
+and write artifact references as normalized POSIX paths. Public artifacts must
+retain those `artifacts/...` paths in the HF evidence repository. Add every log
+pointer to `release/ARTIFACT_POINTERS.json`; the evidence tests must establish
+that it resolves to a public file/directory, a documented metadata pointer for
+deliberately private material, or an explicitly expanded public glob. Never
+leave an unregistered or silently dangling artifact pointer.
+
+Never make an existing repository or dataset public merely because a bundle
+has been built. Visibility changes require confirmation of the exact payload
+and history being exposed.

@@ -1,5 +1,5 @@
 {
-  "freeze_tag": "exp-001-002-freeze-20260810",
+  "source_tag": "exp-001-002-evidence-v1",
   "generated_at": "2026-08-10T19:37:39",
   "git_remote": "git@github.com:MocryMin/layer-evidence-classification.git",
   "hf_dataset_uri": "https://huggingface.co/datasets/MocryMin/lec-exp-001-002-freeze",

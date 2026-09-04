@@ -1,0 +1,321 @@
+{
+  "schema_version": 1,
+  "root_definition": "release/ARTIFACT_ROOTS.json",
+  "policy": "Every artifact pointer in the EXP-001--004 author logs is normalized here. Public files preserve their artifacts/... path; directory pointers may expose a documented subset; deliberately private material resolves to a metadata page.",
+  "records": [
+    {
+      "id": "EXP001-root",
+      "log": "research-logs/EXP-001.md",
+      "line": 8,
+      "literal": "artifacts/EXP-20260729-001/",
+      "normalized_path": "artifacts/EXP-20260729-001/",
+      "availability": "public_directory_subset"
+    },
+    {
+      "id": "EXP001-config",
+      "log": "research-logs/EXP-001.md",
+      "line": 152,
+      "literal": "./run_config.yaml",
+      "normalized_path": "artifacts/EXP-20260729-001/run_config.yaml",
+      "availability": "public_file"
+    },
+    {
+      "id": "EXP001-smoke",
+      "log": "research-logs/EXP-001.md",
+      "line": 158,
+      "literal": "./smoke_lr_results.json",
+      "normalized_path": "artifacts/EXP-20260729-001/smoke_lr_results.json",
+      "availability": "public_file"
+    },
+    {
+      "id": "EXP001-main",
+      "log": "research-logs/EXP-001.md",
+      "line": 187,
+      "literal": "./plain_probe_mainline/results.json",
+      "normalized_path": "artifacts/EXP-20260729-001/plain_probe_mainline/results.json",
+      "availability": "public_file"
+    },
+    {
+      "id": "EXP001-feature-stats",
+      "log": "research-logs/EXP-001.md",
+      "line": 211,
+      "literal": "../EXP-20260729-002/02_variance_collapse/feature_stats_train_with_prompt.json",
+      "normalized_path": "artifacts/EXP-20260729-002/02_variance_collapse/feature_stats_train_with_prompt.json",
+      "availability": "public_file"
+    },
+    {
+      "id": "EXP001-ln-diagnostic",
+      "log": "research-logs/EXP-001.md",
+      "line": 230,
+      "literal": "../EXP-20260729-002/03a_ln_ablation/ln_ablation_lr1e-2.json",
+      "normalized_path": "artifacts/EXP-20260729-002/03a_ln_ablation/ln_ablation_lr1e-2.json",
+      "availability": "public_file"
+    },
+    {
+      "id": "EXP002-root",
+      "log": "research-logs/EXP-002.md",
+      "line": 8,
+      "literal": "artifacts/EXP-20260729-002/",
+      "normalized_path": "artifacts/EXP-20260729-002/",
+      "availability": "public_directory_subset"
+    },
+    {
+      "id": "EXP002-feature-stats",
+      "log": "research-logs/EXP-002.md",
+      "line": 65,
+      "literal": "artifacts/EXP-20260729-002/02_variance_collapse/feature_stats_train_with_prompt.json",
+      "normalized_path": "artifacts/EXP-20260729-002/02_variance_collapse/feature_stats_train_with_prompt.json",
+      "availability": "public_file"
+    },
+    {
+      "id": "EXP002-lr-grid",
+      "log": "research-logs/EXP-002.md",
+      "line": 83,
+      "literal": "./01_lr_grid/lr_grid_plain_adamw.json",
+      "normalized_path": "artifacts/EXP-20260729-002/01_lr_grid/lr_grid_plain_adamw.json",
+      "availability": "public_file"
+    },
+    {
+      "id": "EXP002-no-prompt",
+      "log": "research-logs/EXP-002.md",
+      "line": 117,
+      "literal": "./03b_no_prompt",
+      "normalized_path": "artifacts/EXP-20260729-002/03b_no_prompt/",
+      "availability": "public_directory_subset"
+    },
+    {
+      "id": "EXP002-model",
+      "log": "research-logs/EXP-002.md",
+      "line": 126,
+      "literal": "./models/deberta-v3-base-clinc150-ft/",
+      "normalized_path": "artifacts/EXP-20260729-002/models/deberta-v3-base-clinc150-ft/",
+      "availability": "public_metadata_pointer"
+    },
+    {
+      "id": "EXP002-ft-backbone",
+      "log": "research-logs/EXP-002.md",
+      "line": 138,
+      "literal": "./03c_ft_backbone/",
+      "normalized_path": "artifacts/EXP-20260729-002/03c_ft_backbone/",
+      "availability": "public_directory_subset"
+    },
+    {
+      "id": "EXP002-ln-ablation",
+      "log": "research-logs/EXP-002.md",
+      "line": 180,
+      "literal": "03a_ln_ablation/ln_ablation_lr1e-2.json",
+      "normalized_path": "artifacts/EXP-20260729-002/03a_ln_ablation/ln_ablation_lr1e-2.json",
+      "availability": "public_file"
+    },
+    {
+      "id": "EXP002-transformed-stats",
+      "log": "research-logs/EXP-002.md",
+      "line": 183,
+      "literal": "03a_ln_ablation/transformed_feature_stats.json",
+      "normalized_path": "artifacts/EXP-20260729-002/03a_ln_ablation/transformed_feature_stats.json",
+      "availability": "public_file"
+    },
+    {
+      "id": "EXP002-ln-mlp-roots",
+      "log": "research-logs/EXP-002.md",
+      "line": 194,
+      "literal": "03a_ln_ablation/`,`04_mlp_probe/",
+      "normalized_paths": [
+        "artifacts/EXP-20260729-002/03a_ln_ablation/",
+        "artifacts/EXP-20260729-002/04_mlp_probe/"
+      ],
+      "availability": "public_directory_subset"
+    },
+    {
+      "id": "EXP002-fp16",
+      "log": "research-logs/EXP-002.md",
+      "line": 216,
+      "literal": "03e_fp16_control/",
+      "normalized_path": "artifacts/EXP-20260729-002/03e_fp16_control/",
+      "availability": "public_directory_subset"
+    },
+    {
+      "id": "EXP002-ridge-grid",
+      "log": "research-logs/EXP-002.md",
+      "line": 237,
+      "literal": "03g_ridge_alpha_grid/ridge_base_withprompt.json",
+      "normalized_path": "artifacts/EXP-20260729-002/03g_ridge_alpha_grid/ridge_base_withprompt.json",
+      "availability": "public_file"
+    },
+    {
+      "id": "EXP002-optimizers",
+      "log": "research-logs/EXP-002.md",
+      "line": 258,
+      "literal": "03d_optimizer/optimizer_comparison.json",
+      "normalized_path": "artifacts/EXP-20260729-002/03d_optimizer/optimizer_comparison.json",
+      "availability": "public_file"
+    },
+    {
+      "id": "EXP002-adam-ablation",
+      "log": "research-logs/EXP-002.md",
+      "line": 278,
+      "literal": "03h_adam_ablation/adam_ablation.json",
+      "normalized_path": "artifacts/EXP-20260729-002/03h_adam_ablation/adam_ablation.json",
+      "availability": "public_file"
+    },
+    {
+      "id": "EXP002-mlp",
+      "log": "research-logs/EXP-002.md",
+      "line": 295,
+      "literal": "04_mlp_probe/mlp_probe_lr1e-2.json",
+      "normalized_path": "artifacts/EXP-20260729-002/04_mlp_probe/mlp_probe_lr1e-2.json",
+      "availability": "public_file"
+    },
+    {
+      "id": "EXP002-dead-relu",
+      "log": "research-logs/EXP-002.md",
+      "line": 307,
+      "literal": "04_mlp_probe/dead_relu_diagnosis.json",
+      "normalized_path": "artifacts/EXP-20260729-002/04_mlp_probe/dead_relu_diagnosis.json",
+      "availability": "public_file"
+    },
+    {
+      "id": "EXP002-activation",
+      "log": "research-logs/EXP-002.md",
+      "line": 318,
+      "literal": "05_act_ablation/act_ablation.json",
+      "normalized_path": "artifacts/EXP-20260729-002/05_act_ablation/act_ablation.json",
+      "availability": "public_file"
+    },
+    {
+      "id": "EXP002-token-variance",
+      "log": "research-logs/EXP-002.md",
+      "line": 331,
+      "literal": "06_token_variance/token_variance_check.json",
+      "normalized_path": "artifacts/EXP-20260729-002/06_token_variance/token_variance_check.json",
+      "availability": "public_file"
+    },
+    {
+      "id": "EXP003-root",
+      "log": "research-logs/EXP-003.md",
+      "line": 7,
+      "literal": "artifacts/EXP-20260810-003/",
+      "normalized_path": "artifacts/EXP-20260810-003/",
+      "availability": "public_directory_subset"
+    },
+    {
+      "id": "EXP003-results",
+      "log": "research-logs/EXP-003.md",
+      "line": 76,
+      "literal": "./results.json",
+      "normalized_path": "artifacts/EXP-20260810-003/results.json",
+      "availability": "public_file"
+    },
+    {
+      "id": "EXP003-root-repeat",
+      "log": "research-logs/EXP-003.md",
+      "line": 56,
+      "literal": "artifacts/EXP-20260810-003/",
+      "normalized_path": "artifacts/EXP-20260810-003/",
+      "availability": "public_directory_subset"
+    },
+    {
+      "id": "EXP003-classwise",
+      "log": "research-logs/EXP-003.md",
+      "line": 179,
+      "literal": "./(.*?)/classwise_summary.json",
+      "normalized_paths": [
+        "artifacts/EXP-20260810-003/centered_plain/classwise_summary.json",
+        "artifacts/EXP-20260810-003/ln_plain/classwise_summary.json",
+        "artifacts/EXP-20260810-003/ridge/classwise_summary.json"
+      ],
+      "availability": "public_pattern_expansion"
+    },
+    {
+      "id": "EXP003-convergence-summary",
+      "log": "research-logs/EXP-003.md",
+      "line": 185,
+      "literal": "./convergence_probe/convergence_summary.json",
+      "normalized_path": "artifacts/EXP-20260810-003/convergence_probe/convergence_summary.json",
+      "availability": "public_file"
+    },
+    {
+      "id": "EXP003-convergence-histories",
+      "log": "research-logs/EXP-003.md",
+      "line": 185,
+      "literal": "./convergence_probe/val_history_{family}_seed17.npz",
+      "normalized_paths": [
+        "artifacts/EXP-20260810-003/convergence_probe/val_history_centered_plain_seed17.npz",
+        "artifacts/EXP-20260810-003/convergence_probe/val_history_ln_plain_seed17.npz"
+      ],
+      "availability": "public_pattern_expansion"
+    },
+    {
+      "id": "EXP004-root",
+      "log": "research-logs/EXP-004.md",
+      "line": 7,
+      "literal": "artifacts/EXP-20260824-004/",
+      "normalized_path": "artifacts/EXP-20260824-004/",
+      "availability": "public_logical_index"
+    },
+    {
+      "id": "EXP004-modular-probe",
+      "log": "research-logs/EXP-004.md",
+      "line": 16,
+      "literal": "./fragmented-experiments/mudularized_layer_probe_260813_01",
+      "normalized_path": "artifacts/fragmented-experiments/mudularized_layer_probe_260813_01/",
+      "availability": "public_directory_subset"
+    },
+    {
+      "id": "EXP004-uniform-smoke",
+      "log": "research-logs/EXP-004.md",
+      "line": 19,
+      "literal": "./fragmented-experiments/uniform_head_smoke_260824",
+      "normalized_path": "artifacts/fragmented-experiments/uniform_head_smoke_260824/",
+      "availability": "public_directory_subset"
+    },
+    {
+      "id": "EXP004-uniform-main",
+      "log": "research-logs/EXP-004.md",
+      "line": 19,
+      "literal": "./fragmented-experiments/uniform_head_260824_01",
+      "normalized_path": "artifacts/fragmented-experiments/uniform_head_260824_01/",
+      "availability": "public_directory_subset"
+    },
+    {
+      "id": "EXP004-head-qualification",
+      "log": "research-logs/EXP-004.md",
+      "line": 125,
+      "literal": "./EXP-20260827-004-h1-head-qualification-v2/head_qualification.json",
+      "normalized_path": "artifacts/EXP-20260827-004-h1-head-qualification-v2/head_qualification.json",
+      "availability": "public_file"
+    },
+    {
+      "id": "EXP004-sourcewise-witness",
+      "log": "research-logs/EXP-004.md",
+      "line": 132,
+      "literal": "./EXP-20260828-004-h1-sourcewise-rerun/results/p_84ec26e17f1a4b06.json",
+      "normalized_path": "artifacts/EXP-20260828-004-h1-sourcewise-rerun/results/p_84ec26e17f1a4b06.json",
+      "availability": "public_file"
+    },
+    {
+      "id": "EXP004-legacy-summary",
+      "log": "research-logs/EXP-004.md",
+      "line": 149,
+      "literal": "./EXP-20260827-004-h1-discovery/discovery_summary.json",
+      "normalized_path": "artifacts/EXP-20260827-004-h1-discovery/discovery_summary.json",
+      "availability": "public_file"
+    },
+    {
+      "id": "EXP004-legacy-results",
+      "log": "research-logs/EXP-004.md",
+      "line": 149,
+      "literal": "results/*.json",
+      "normalized_path": "artifacts/EXP-20260827-004-h1-discovery/results/*.json",
+      "availability": "public_glob"
+    },
+    {
+      "id": "EXP004-h2-root",
+      "log": "research-logs/EXP-004.md",
+      "line": 177,
+      "literal": "EXP-20260831-004-h2-mcts-v2/",
+      "normalized_path": "artifacts/EXP-20260831-004-h2-mcts-v2/",
+      "availability": "public_directory_subset"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "release_revision": "exp-001-004-evidence-v1",
+  "github_source_root": "https://github.com/MocryMin/layer-evidence-classification/tree/exp-001-004-evidence-v1",
+  "hf_dataset_id": "MocryMin/lec-exp-001-004-evidence",
+  "evidence_root_uri": "hf://datasets/MocryMin/lec-exp-001-004-evidence@exp-001-004-evidence-v1/",
+  "artifacts_root_uri": "hf://datasets/MocryMin/lec-exp-001-004-evidence@exp-001-004-evidence-v1/artifacts/",
+  "exp_root_uri": "hf://datasets/MocryMin/lec-exp-001-004-evidence@exp-001-004-evidence-v1/artifacts/",
+  "artifacts_web_root": "https://huggingface.co/datasets/MocryMin/lec-exp-001-004-evidence/tree/exp-001-004-evidence-v1/artifacts",
+  "mapping_rule": "EVIDENCE_ROOT + repository-relative artifact path; equivalently EXP_ROOT/ARTIFACTS_ROOT + path relative to artifacts/"
+}

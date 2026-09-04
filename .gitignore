@@ -34,6 +34,7 @@ cache/
 # MLflow
 mlruns/
 mlruns.db
+dist/
 *.db-journal
 
 # Model and tensor files

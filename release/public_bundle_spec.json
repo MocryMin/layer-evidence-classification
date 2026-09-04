@@ -1,0 +1,726 @@
+{
+  "schema_version": 1,
+  "bundle_id": "lec-exp-001-004-evidence-v1",
+  "source_revision": "exp-001-004-evidence-v1",
+  "github_url": "https://github.com/MocryMin/layer-evidence-classification",
+  "hf_dataset_id": "MocryMin/lec-exp-001-004-evidence",
+  "hf_dataset_url": "https://huggingface.co/datasets/MocryMin/lec-exp-001-004-evidence",
+  "max_file_bytes": 60000000,
+  "canonical_mlflow_run_ids": [
+    "cd6fea4725fb4ba8aa2dccf1459ae424",
+    "38d2497a9a8249fbb50b4010fd925600",
+    "d91a96ac7b4a4c98bd09e0617972f7a6",
+    "af5a82f66ae24d6284f0d58e610ee067",
+    "364bf897628d443189b1ae6f1288fc6e",
+    "e5c6d9f4b28747828141a71a30038149",
+    "e5063c48a6b64d9c9bbb9b1f9be8df5f",
+    "2cb07862047547969e488b483fe63029",
+    "c87329b84673479192acff8ed2eca884",
+    "6e6ca8ca7f444565902d9599d50f14ad",
+    "b8623dfa7451468aa772f093a3ec02e7",
+    "91b55dc78bf14b9f8ccca9e94582e0e5",
+    "2ba85363b2ac44fa9ac5e7318c4e04c6"
+  ],
+  "stale_mlflow_run_ids": [
+    "e27060ddb8f04843a83dd76327d3bd34",
+    "0abcf6ae88ea44349dd26cebbeab6f14",
+    "8b47af1530544b3a8ef58549a22a2ef2"
+  ],
+  "files": [
+    {
+      "source": "README.md",
+      "release_path": "PROJECT_README.md",
+      "category": "navigation",
+      "split_sensitivity": "none",
+      "rationale": "Public project entry point."
+    },
+    {
+      "source": "PROJECT_STATUS.md",
+      "category": "navigation",
+      "split_sensitivity": "none",
+      "rationale": "Audited project and evidence status."
+    },
+    {
+      "source": "docs/EVIDENCE_INDEX.md",
+      "category": "claim_index",
+      "split_sensitivity": "none",
+      "rationale": "Authoritative claim-to-evidence map."
+    },
+    {
+      "source": "docs/REPRODUCIBILITY.md",
+      "category": "reproducibility",
+      "split_sensitivity": "none",
+      "rationale": "Defines audit and rerun expectations."
+    },
+    {
+      "source": "docs/ARTIFACT_REGISTRY.md",
+      "category": "reproducibility",
+      "split_sensitivity": "none",
+      "rationale": "Documents public/private storage boundary."
+    },
+    {
+      "source": "docs/PUBLIC_ARTIFACTS.md",
+      "category": "reproducibility",
+      "split_sensitivity": "none",
+      "rationale": "Defines stable public roots and exact path-resolution rules."
+    },
+    {
+      "source": "release/ARTIFACT_ROOTS.json",
+      "release_path": "ARTIFACT_ROOTS.json",
+      "category": "pointer_registry",
+      "split_sensitivity": "none",
+      "rationale": "Machine-readable GitHub/HF root definitions."
+    },
+    {
+      "source": "release/ARTIFACT_POINTERS.json",
+      "release_path": "ARTIFACT_POINTERS.json",
+      "category": "pointer_registry",
+      "split_sensitivity": "none",
+      "rationale": "Normalizes every artifact pointer in the EXP-001--004 author logs."
+    },
+    {
+      "source": "release/ARTIFACTS_README.md",
+      "release_path": "artifacts/README.md",
+      "category": "artifact_index",
+      "split_sensitivity": "none",
+      "rationale": "Explains the selected public view at the stable artifact root."
+    },
+    {
+      "source": "release/artifact-index/EXP-20260824-004.md",
+      "release_path": "artifacts/EXP-20260824-004/README.md",
+      "category": "artifact_index",
+      "split_sensitivity": "none",
+      "rationale": "Makes the historical EXP-004 umbrella path resolvable."
+    },
+    {
+      "source": "release/artifact-index/deberta-ft-model.md",
+      "release_path": "artifacts/EXP-20260729-002/models/deberta-v3-base-clinc150-ft/README.md",
+      "category": "private_artifact_pointer",
+      "split_sensitivity": "none",
+      "rationale": "Resolves the historical model pointer while documenting non-redistribution."
+    },
+    {
+      "source": "docs/ERRATA.md",
+      "category": "claim_index",
+      "split_sensitivity": "none",
+      "rationale": "Non-destructive corrections to frozen records."
+    },
+    {
+      "source": "research-logs/EXP-001.md",
+      "category": "author_log",
+      "split_sensitivity": "aggregate_train_validation_test",
+      "rationale": "Historical initial experiment log."
+    },
+    {
+      "source": "research-logs/EXP-002.md",
+      "category": "author_log",
+      "split_sensitivity": "aggregate_train_validation_test",
+      "rationale": "Author-written diagnostic record."
+    },
+    {
+      "source": "research-logs/EXP-003.md",
+      "category": "author_log",
+      "split_sensitivity": "aggregate_validation_test",
+      "rationale": "Author-written confirmatory record."
+    },
+    {
+      "source": "research-logs/EXP-004.md",
+      "category": "author_log",
+      "split_sensitivity": "mixed_train_discovery_and_aggregate_test",
+      "rationale": "Author-written H1/H2 record; interpreted with ERRATA."
+    },
+    {
+      "source": "research-logs/POST-EXP-003-DIRECTION-HISTORY.md",
+      "category": "research_history",
+      "split_sensitivity": "none",
+      "rationale": "Documents research-direction evolution; not hypothesis evidence."
+    },
+    {
+      "source": "research-logs/SOURCE_MANIFEST.json",
+      "category": "manifest",
+      "split_sensitivity": "none",
+      "rationale": "Verifies byte-identical host-log snapshots."
+    },
+    {
+      "source": "agent-BuildReports/experiments/EXP-20260729-001--intermediate-layer-recoverability.md",
+      "category": "objective_report",
+      "split_sensitivity": "aggregate_train_validation_test",
+      "rationale": "Objective record of the superseded initial experiment."
+    },
+    {
+      "source": "agent-BuildReports/experiments/EXP-20260729-002--linear-probe-midlayer-collapse.md",
+      "category": "objective_report",
+      "split_sensitivity": "aggregate_train_validation_test",
+      "rationale": "Objective C1 evidence report."
+    },
+    {
+      "source": "agent-BuildReports/experiments/EXP-20260810-003--validated-probe-recoverability.md",
+      "category": "objective_report",
+      "split_sensitivity": "aggregate_validation_test",
+      "rationale": "Objective C2 evidence report."
+    },
+    {
+      "source": "agent-BuildReports/experiments/EXP-20260828-004-H1-agent-report.md",
+      "category": "objective_report",
+      "split_sensitivity": "train_discovery_only",
+      "rationale": "Objective C3 report and strict evidence boundary."
+    },
+    {
+      "source": "agent-BuildReports/experiments/EXP-20260831-004-H2-agent-report.md",
+      "category": "objective_report",
+      "split_sensitivity": "aggregate_validation_test",
+      "rationale": "Objective C4 report."
+    },
+    {
+      "source": "agent-BuildReports/experiments/FRAG-20260828-004-early-readability.md",
+      "category": "supplementary_report",
+      "split_sensitivity": "train_discovery_only",
+      "rationale": "Diagnostic explanation for shallow-source behavior."
+    },
+    {
+      "source": "agent-BuildReports/fragmented-experiments/README.md",
+      "category": "supplementary_index",
+      "split_sensitivity": "none",
+      "rationale": "Categorized map of exploratory controls without promoting them to confirmatory evidence."
+    },
+    {
+      "source": "requirements.txt",
+      "category": "environment",
+      "split_sensitivity": "none",
+      "rationale": "Tracked software requirements."
+    },
+    {
+      "source": "requirements-dev.txt",
+      "category": "environment",
+      "split_sensitivity": "none",
+      "rationale": "Pinned test-runner dependency; not installed into the historical shared environment."
+    },
+    {
+      "source": "scripts/audit_public_artifact_pointers.py",
+      "category": "reproducibility",
+      "split_sensitivity": "none",
+      "rationale": "Standalone verification of every normalized author-log artifact pointer."
+    },
+    {
+      "source": "configs/exp_config.yaml",
+      "category": "config",
+      "split_sensitivity": "none",
+      "rationale": "EXP-001 configuration."
+    },
+    {
+      "source": "configs/diag_config.yaml",
+      "category": "config",
+      "split_sensitivity": "none",
+      "rationale": "EXP-002 configuration."
+    },
+    {
+      "source": "configs/exp003_config.yaml",
+      "category": "config",
+      "split_sensitivity": "none",
+      "rationale": "EXP-003 configuration."
+    },
+    {
+      "source": "configs/exp004_h1_frozen.yaml",
+      "category": "config",
+      "split_sensitivity": "none",
+      "rationale": "Frozen initial H1 discovery configuration."
+    },
+    {
+      "source": "configs/exp004_h1_sourcewise_rerun.yaml",
+      "category": "config",
+      "split_sensitivity": "none",
+      "rationale": "Corrected source-wise H1 configuration."
+    },
+    {
+      "source": "configs/exp004_h2_full_v2.yaml",
+      "category": "config",
+      "split_sensitivity": "none",
+      "rationale": "Frozen H2 full-run configuration."
+    },
+    {
+      "source": "user_exp_plans/EXP-20260729-001--Verifying Intermediate-LayerRecoverability in Fine-Grained Intent Classification/EXP-20260729-001--Verifying Intermediate-LayerRecoverability in Fine-Grained Intent Classification.md",
+      "category": "protocol",
+      "split_sensitivity": "none",
+      "rationale": "Original mainline protocol."
+    },
+    {
+      "source": "user_exp_plans/EXP-20260810-003-Restore EXP-001 under a probe protocol that EXP-002 has shown to be valid/EXP-20260810-003-Restore EXP-001 under a probe protocol that EXP-002 has shown to be valid.md",
+      "category": "protocol",
+      "split_sensitivity": "none",
+      "rationale": "EXP-003 verification protocol."
+    },
+    {
+      "source": "user_exp_plans/EXP-20260827-004-h1-frozen-protocol.md",
+      "category": "protocol",
+      "split_sensitivity": "none",
+      "rationale": "Frozen H1 discovery protocol."
+    },
+    {
+      "source": "user_exp_plans/EXP-20260828-004-h1-sourcewise-rerun-protocol.md",
+      "category": "protocol",
+      "split_sensitivity": "none",
+      "rationale": "H1 source-wise correction and legacy boundary."
+    },
+    {
+      "source": "artifacts/EXP-20260729-001/run_config.yaml",
+      "category": "machine_config",
+      "split_sensitivity": "none",
+      "rationale": "Resolved EXP-001 configuration."
+    },
+    {
+      "source": "artifacts/EXP-20260729-001/smoke_lr_results.json",
+      "category": "machine_result",
+      "split_sensitivity": "aggregate_validation_test",
+      "rationale": "Initial smoke evidence."
+    },
+    {
+      "source": "artifacts/EXP-20260729-001/plain_probe_mainline/results.json",
+      "category": "machine_result",
+      "split_sensitivity": "aggregate_validation_test",
+      "rationale": "Full initial mainline metrics; no raw text or tensors."
+    },
+    {
+      "source": "artifacts/EXP-20260729-002/02_variance_collapse/per_layer_collapse_summary.json",
+      "category": "machine_result",
+      "split_sensitivity": "aggregate_train_validation_test",
+      "rationale": "Per-layer conditioning and probe comparison."
+    },
+    {
+      "source": "artifacts/EXP-20260729-002/02_variance_collapse/feature_stats_train_with_prompt.json",
+      "category": "machine_result",
+      "split_sensitivity": "aggregate_train",
+      "rationale": "Directly cited train feature-statistics record."
+    },
+    {
+      "source": "artifacts/EXP-20260729-002/01_lr_grid/lr_grid_plain_adamw.json",
+      "category": "machine_result",
+      "split_sensitivity": "aggregate_validation",
+      "rationale": "Complete learning-rate curve directly cited by the author log."
+    },
+    {
+      "source": "artifacts/EXP-20260729-002/03a_ln_ablation/ln_ablation_lr1e-2.json",
+      "category": "machine_result",
+      "split_sensitivity": "aggregate_validation_test",
+      "rationale": "Normalization ablation."
+    },
+    {
+      "source": "artifacts/EXP-20260729-002/03a_ln_ablation/transformed_feature_stats.json",
+      "category": "machine_result",
+      "split_sensitivity": "aggregate_train",
+      "rationale": "Transformed feature statistics directly cited by the author log."
+    },
+    {
+      "source": "artifacts/EXP-20260729-002/03b_no_prompt/feature_stats_train_no_prompt.json",
+      "category": "machine_result",
+      "split_sensitivity": "aggregate_train",
+      "rationale": "Small no-prompt feature summary within a cited directory."
+    },
+    {
+      "source": "artifacts/EXP-20260729-002/03b_no_prompt/plain_probe_no_prompt.json",
+      "category": "machine_result",
+      "split_sensitivity": "aggregate_validation_test",
+      "rationale": "No-prompt probe result within a cited directory."
+    },
+    {
+      "source": "artifacts/EXP-20260729-002/03c_ft_backbone/feature_stats_train_ft.json",
+      "category": "machine_result",
+      "split_sensitivity": "aggregate_train",
+      "rationale": "Fine-tuned-backbone feature statistics within a cited directory."
+    },
+    {
+      "source": "artifacts/EXP-20260729-002/03c_ft_backbone/ft_history.json",
+      "category": "machine_result",
+      "split_sensitivity": "aggregate_validation",
+      "rationale": "Fine-tuning history within a cited directory."
+    },
+    {
+      "source": "artifacts/EXP-20260729-002/03c_ft_backbone/plain_probe_ft.json",
+      "category": "machine_result",
+      "split_sensitivity": "aggregate_validation_test",
+      "rationale": "Fine-tuned-backbone plain-probe result."
+    },
+    {
+      "source": "artifacts/EXP-20260729-002/03c_ft_backbone/plain_ln_probe_ft.json",
+      "category": "machine_result",
+      "split_sensitivity": "aggregate_validation_test",
+      "rationale": "Fine-tuned-backbone LN-probe result."
+    },
+    {
+      "source": "artifacts/EXP-20260729-002/03d_optimizer/optimizer_comparison.json",
+      "category": "machine_result",
+      "split_sensitivity": "aggregate_validation_test",
+      "rationale": "Optimizer comparison."
+    },
+    {
+      "source": "artifacts/EXP-20260729-002/03e_fp16_control/result.json",
+      "category": "machine_result",
+      "split_sensitivity": "aggregate_validation_test",
+      "rationale": "Precision control."
+    },
+    {
+      "source": "artifacts/EXP-20260729-002/03g_ridge_alpha_grid/summary.json",
+      "category": "machine_result",
+      "split_sensitivity": "aggregate_validation_test",
+      "rationale": "Ridge regularization selection."
+    },
+    {
+      "source": "artifacts/EXP-20260729-002/03g_ridge_alpha_grid/ridge_base_withprompt.json",
+      "category": "machine_result",
+      "split_sensitivity": "aggregate_validation_test",
+      "rationale": "Full ridge result directly cited by the author log."
+    },
+    {
+      "source": "artifacts/EXP-20260729-002/03g_ridge_alpha_grid/ols_reference.json",
+      "category": "machine_result",
+      "split_sensitivity": "aggregate_validation_test",
+      "rationale": "Closed-form solver reference."
+    },
+    {
+      "source": "artifacts/EXP-20260729-002/03h_adam_ablation/adam_ablation.json",
+      "category": "machine_result",
+      "split_sensitivity": "aggregate_validation_test",
+      "rationale": "Full optimizer-factor diagnostic histories."
+    },
+    {
+      "source": "artifacts/EXP-20260729-002/04_mlp_probe/mlp_probe_lr1e-2.json",
+      "category": "machine_result",
+      "split_sensitivity": "aggregate_validation_test",
+      "rationale": "Nonlinear-capacity control."
+    },
+    {
+      "source": "artifacts/EXP-20260729-002/04_mlp_probe/dead_relu_diagnosis.json",
+      "category": "machine_result",
+      "split_sensitivity": "aggregate_train",
+      "rationale": "Uniform-attractor diagnostic."
+    },
+    {
+      "source": "artifacts/EXP-20260729-002/05_act_ablation/act_ablation.json",
+      "category": "machine_result",
+      "split_sensitivity": "aggregate_validation",
+      "rationale": "Activation-family control."
+    },
+    {
+      "source": "artifacts/EXP-20260729-002/06_token_variance/token_variance_check.json",
+      "category": "machine_result",
+      "split_sensitivity": "aggregate_train",
+      "rationale": "CLS versus non-CLS variance diagnostic."
+    },
+    {
+      "source": "artifacts/EXP-20260810-003/run_config.yaml",
+      "category": "machine_config",
+      "split_sensitivity": "none",
+      "rationale": "Resolved EXP-003 configuration."
+    },
+    {
+      "source": "artifacts/EXP-20260810-003/results.json",
+      "category": "machine_result",
+      "split_sensitivity": "aggregate_validation_test",
+      "rationale": "Canonical confirmatory metrics and acceptance calculations."
+    },
+    {
+      "source": "artifacts/EXP-20260810-003/convergence_probe/convergence_summary.json",
+      "category": "machine_result",
+      "split_sensitivity": "aggregate_validation_test",
+      "rationale": "Follow-up convergence audit."
+    },
+    {
+      "source": "artifacts/EXP-20260810-003/convergence_probe/val_history_centered_plain_seed17.npz",
+      "category": "machine_result_history",
+      "split_sensitivity": "aggregate_validation",
+      "rationale": "Directly cited aggregate convergence history; inspected NPZ without object arrays.",
+      "allow_forbidden_suffix": true
+    },
+    {
+      "source": "artifacts/EXP-20260810-003/convergence_probe/val_history_ln_plain_seed17.npz",
+      "category": "machine_result_history",
+      "split_sensitivity": "aggregate_validation",
+      "rationale": "Directly cited aggregate convergence history; inspected NPZ without object arrays.",
+      "allow_forbidden_suffix": true
+    },
+    {
+      "source": "artifacts/EXP-20260810-003/centered_plain/classwise_summary.json",
+      "category": "machine_result",
+      "split_sensitivity": "aggregate_test_by_class",
+      "rationale": "Class-distribution check for the primary probe."
+    },
+    {
+      "source": "artifacts/EXP-20260810-003/ln_plain/classwise_summary.json",
+      "category": "machine_result",
+      "split_sensitivity": "aggregate_test_by_class",
+      "rationale": "Class-distribution robustness control."
+    },
+    {
+      "source": "artifacts/EXP-20260810-003/ridge/classwise_summary.json",
+      "category": "machine_result",
+      "split_sensitivity": "aggregate_test_by_class",
+      "rationale": "Class-distribution solver reference."
+    },
+    {
+      "source": "artifacts/EXP-20260827-004-h1-qualification/run_manifest.json",
+      "category": "run_manifest",
+      "split_sensitivity": "train_discovery_only",
+      "rationale": "Model, Git, access, and completion provenance."
+    },
+    {
+      "source": "artifacts/EXP-20260827-004-h1-qualification/resolved_config.yaml",
+      "category": "machine_config",
+      "split_sensitivity": "none",
+      "rationale": "Resolved H1 qualification configuration."
+    },
+    {
+      "source": "artifacts/EXP-20260827-004-h1-qualification/split_indices.json",
+      "category": "split_manifest",
+      "split_sensitivity": "train_indices_only",
+      "rationale": "Deterministic D_fit/D_discover membership and hash; no text."
+    },
+    {
+      "source": "artifacts/EXP-20260827-004-h1-qualification/canonical_equivalence.json",
+      "category": "audit",
+      "split_sensitivity": "train_discovery_only",
+      "rationale": "Native/modular forward equivalence."
+    },
+    {
+      "source": "artifacts/EXP-20260827-004-h1-qualification/qualification_metrics.json",
+      "category": "machine_result",
+      "split_sensitivity": "aggregate_train_discovery",
+      "rationale": "Canonical baselines and throughput."
+    },
+    {
+      "source": "artifacts/EXP-20260827-004-h1-head-qualification-v2/run_manifest.json",
+      "category": "run_manifest",
+      "split_sensitivity": "train_discovery_only",
+      "rationale": "Task-head qualification provenance."
+    },
+    {
+      "source": "artifacts/EXP-20260827-004-h1-head-qualification-v2/folds.json",
+      "category": "split_manifest",
+      "split_sensitivity": "train_indices_only",
+      "rationale": "D_fit-only cross-validation assignment."
+    },
+    {
+      "source": "artifacts/EXP-20260827-004-h1-head-qualification-v2/head_qualification.json",
+      "category": "machine_result",
+      "split_sensitivity": "aggregate_train_discovery",
+      "rationale": "L2 selection and refit result; no weights."
+    },
+    {
+      "source": "artifacts/EXP-20260827-004-h1-structured-pilot/run_manifest.json",
+      "category": "run_manifest",
+      "split_sensitivity": "train_discovery_only",
+      "rationale": "Pilot provenance and non-confirmatory label."
+    },
+    {
+      "source": "artifacts/EXP-20260827-004-h1-structured-pilot/path_pool.json",
+      "category": "path_manifest",
+      "split_sensitivity": "none",
+      "rationale": "Complete structured pilot path definitions."
+    },
+    {
+      "source": "artifacts/EXP-20260827-004-h1-structured-pilot/pilot_summary.json",
+      "category": "machine_result",
+      "split_sensitivity": "aggregate_train_discovery",
+      "rationale": "Pilot aggregate."
+    },
+    {
+      "source": "artifacts/EXP-20260827-004-h1-structured-pilot/results/repeat_L28.json",
+      "category": "machine_result",
+      "split_sensitivity": "aggregate_train_discovery",
+      "rationale": "Independent readability-gap control witness."
+    },
+    {
+      "source": "artifacts/EXP-20260827-004-h1-structured-pilot/audits/repeat_L28.json",
+      "category": "audit",
+      "split_sensitivity": "aggregate_train_discovery",
+      "rationale": "Witness replay audit."
+    },
+    {
+      "source": "artifacts/EXP-20260827-004-h1-structured-pilot/audits/repeat_L28_batch8.json",
+      "category": "audit",
+      "split_sensitivity": "aggregate_train_discovery",
+      "rationale": "Witness batch-shape audit."
+    },
+    {
+      "source": "artifacts/EXP-20260827-004-h1-discovery/run_manifest.json",
+      "category": "run_manifest",
+      "split_sensitivity": "train_discovery_only",
+      "rationale": "Legacy discovery completion and recovery history."
+    },
+    {
+      "source": "artifacts/EXP-20260827-004-h1-discovery/resolved_config.yaml.json",
+      "category": "machine_config",
+      "split_sensitivity": "none",
+      "rationale": "Exact legacy sampler configuration."
+    },
+    {
+      "source": "artifacts/EXP-20260827-004-h1-discovery/discovery_summary.json",
+      "category": "machine_result",
+      "split_sensitivity": "aggregate_train_discovery",
+      "rationale": "Legacy aggregate and source-wise counts."
+    },
+    {
+      "source": "artifacts/EXP-20260827-004-h1-discovery/search_state.json",
+      "category": "path_manifest",
+      "split_sensitivity": "train_discovery_only",
+      "rationale": "Legacy populations and RNG/search state; no sample text."
+    },
+    {
+      "source": "artifacts/EXP-20260827-004-h1-discovery/mlflow_run.json",
+      "category": "run_pointer",
+      "split_sensitivity": "none",
+      "rationale": "Post-hoc MLflow registration pointer."
+    },
+    {
+      "source": "artifacts/EXP-20260828-004-h1-sourcewise-rerun/run_manifest.json",
+      "category": "run_manifest",
+      "split_sensitivity": "train_discovery_only",
+      "rationale": "Corrected source-wise discovery provenance."
+    },
+    {
+      "source": "artifacts/EXP-20260828-004-h1-sourcewise-rerun/resolved_config.yaml.json",
+      "category": "machine_config",
+      "split_sensitivity": "none",
+      "rationale": "Exact corrected sampler configuration and legacy boundary."
+    },
+    {
+      "source": "artifacts/EXP-20260828-004-h1-sourcewise-rerun/discovery_summary.json",
+      "category": "machine_result",
+      "split_sensitivity": "aggregate_train_discovery",
+      "rationale": "Corrected aggregate, source, and cache metrics."
+    },
+    {
+      "source": "artifacts/EXP-20260828-004-h1-sourcewise-rerun/search_state.json",
+      "category": "path_manifest",
+      "split_sensitivity": "train_discovery_only",
+      "rationale": "Corrected populations and RNG/search state; no sample text."
+    },
+    {
+      "source": "artifacts/EXP-20260828-004-h1-sourcewise-rerun/operational_cache_policy.json",
+      "category": "audit",
+      "split_sensitivity": "none",
+      "rationale": "Recorded non-semantic cache intervention."
+    },
+    {
+      "source": "artifacts/EXP-20260828-004-h1-sourcewise-rerun/mlflow_run.json",
+      "category": "run_pointer",
+      "split_sensitivity": "none",
+      "rationale": "Post-hoc MLflow registration pointer."
+    },
+    {
+      "source": "artifacts/EXP-20260831-004-h2-numerical-audit/results.json",
+      "category": "audit",
+      "split_sensitivity": "validation_only",
+      "rationale": "Batch-shape numerical audit."
+    },
+    {
+      "source": "artifacts/EXP-20260831-004-h2-mcts-v2/run_manifest.json",
+      "category": "run_manifest",
+      "split_sensitivity": "aggregate_validation_test",
+      "rationale": "H2 execution and Git provenance."
+    },
+    {
+      "source": "artifacts/EXP-20260831-004-h2-mcts-v2/resolved_full_config.yaml",
+      "category": "machine_config",
+      "split_sensitivity": "none",
+      "rationale": "Resolved H2 full-run configuration."
+    },
+    {
+      "source": "artifacts/EXP-20260831-004-h2-mcts-v2/resolved_semantics_config.yaml",
+      "category": "machine_config",
+      "split_sensitivity": "none",
+      "rationale": "Resolved search semantics."
+    },
+    {
+      "source": "artifacts/EXP-20260831-004-h2-mcts-v2/tuning_indices.json",
+      "category": "split_manifest",
+      "split_sensitivity": "validation_indices_only",
+      "rationale": "Frozen 30/30 tuning selection."
+    },
+    {
+      "source": "artifacts/EXP-20260831-004-h2-mcts-v2/tuning_selection.json",
+      "category": "machine_result",
+      "split_sensitivity": "aggregate_validation",
+      "rationale": "All grid metrics and frozen selections."
+    },
+    {
+      "source": "artifacts/EXP-20260831-004-h2-mcts-v2/test_access_gate.json",
+      "category": "audit",
+      "split_sensitivity": "none",
+      "rationale": "Evidence that tuning selection preceded test access."
+    },
+    {
+      "source": "artifacts/EXP-20260831-004-h2-mcts-v2/final_summary.json",
+      "category": "machine_result",
+      "split_sensitivity": "aggregate_test",
+      "rationale": "Automated test summary and preregistered decision."
+    },
+    {
+      "source": "artifacts/EXP-20260831-004-h2-mcts-v2/postrun_audit.json",
+      "category": "audit",
+      "split_sensitivity": "aggregate_test",
+      "rationale": "Independent reconstruction and integrity audit."
+    },
+    {
+      "source": "artifacts/EXP-20260831-004-h2-mcts-v2/pause_resume_audit.json",
+      "category": "audit",
+      "split_sensitivity": "none",
+      "rationale": "Lossless pause/resume and timer exception."
+    },
+    {
+      "source": "artifacts/EXP-20260831-004-h2-mcts-v2/mlflow_run.json",
+      "category": "run_pointer",
+      "split_sensitivity": "none",
+      "rationale": "Canonical H2 MLflow pointer."
+    }
+  ],
+  "file_sets": [
+    {
+      "source_glob": "artifacts/EXP-20260827-004-h1-discovery/results/*.json",
+      "category": "path_result_inventory",
+      "split_sensitivity": "aggregate_train_discovery",
+      "rationale": "Complete legacy H1 per-path JSON inventory cited as results/*.json by the author log.",
+      "max_matches": 3000
+    },
+    {
+      "source_glob": "artifacts/EXP-20260828-004-h1-sourcewise-rerun/results/*.json",
+      "category": "path_result_inventory",
+      "split_sensitivity": "aggregate_train_discovery",
+      "rationale": "Complete corrected source-wise H1 per-path JSON inventory.",
+      "max_matches": 2500
+    },
+    {
+      "source_glob": "artifacts/fragmented-experiments/mudularized_layer_probe_260813_01/*.json*",
+      "category": "fragmented_result",
+      "split_sensitivity": "aggregate_validation",
+      "rationale": "Small result and node-metadata files at a directory directly cited by EXP-004.",
+      "max_matches": 20
+    },
+    {
+      "source_glob": "artifacts/fragmented-experiments/mudularized_layer_probe_260813_01/analysis/*.json",
+      "category": "fragmented_analysis",
+      "split_sensitivity": "aggregate_validation",
+      "rationale": "Small derived analyses at a directory directly cited by EXP-004.",
+      "max_matches": 20
+    },
+    {
+      "source_glob": "artifacts/fragmented-experiments/mudularized_layer_probe_260813_01/analysis/*.csv",
+      "category": "fragmented_analysis",
+      "split_sensitivity": "aggregate_validation",
+      "rationale": "Tabular path features supporting a directory directly cited by EXP-004.",
+      "max_matches": 20
+    },
+    {
+      "source_glob": "artifacts/fragmented-experiments/uniform_head_smoke_260824/*.json*",
+      "category": "fragmented_result",
+      "split_sensitivity": "aggregate_validation",
+      "rationale": "Small smoke-result files at a directory directly cited by EXP-004.",
+      "max_matches": 20
+    },
+    {
+      "source_glob": "artifacts/fragmented-experiments/uniform_head_260824_01/*.json*",
+      "category": "fragmented_result",
+      "split_sensitivity": "aggregate_validation",
+      "rationale": "Small full-run result files at a directory directly cited by EXP-004.",
+      "max_matches": 20
+    }
+  ]
+}

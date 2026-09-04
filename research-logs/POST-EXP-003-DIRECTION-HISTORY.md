@@ -1,0 +1,127 @@
+
+## 1. After EXP-003
+
+EXP-001~003 confirmed strong mid-layer recoverability over final layer under `DeBERTa-v3-base` on `CLINC150`. Scattered sideway verifying experiments after EXP-003 showed similar patterns on `ModernBERT-base` and `Qwen3-embedding-0.6b`. 
+> (artifacts: `./artifacts/fragmented_experiments/ X {ModernBERTBaseExp1Ver_260812_02, Qwen3Emb0p6bExp1Ver_260812_01}`)
+
+But I realized a more universal method than *intermediate layer recovering final layer*--maybe the combination method of layer 1->2->3...final itself could be optimized under different downstream tasks. Actually, a relative to mid-layer recovery, early exist, which our EXP-001 $H_1$ and $H_1'$ is highly related, opened the develop line of layer slectivity. [Elbayad et al. (2019), Depth-Adaptive Transformer]
+After simple browse across the line of early exist->skip, repeat->arbitrary routing, I found underlying potentials in this field: class-aware/class-competition router, path-aware, learnt routing *vocabulary*, which is relevant to our previous work and inspirations and might possess novelty potential. 
+But before diving into detailed experiment, l will do a general scope research on these potential directions and prior works to draw clear prospect map on our future work.  
+
+## 2. Literature Review
+
+My prior work research is carried out by two separate research lines. The first follows the development of routing action space. And the second focuses on recent works that show relevance to my direction. 
+
+### 2.1 History: from Early Exist to Arbitrary Routing
+
+In EXP-001 we verified non-inferiority and superiority of mid layers over final layer on `DeBERTa-v3-base`, [Elbayad et al., 2019] questioned whether different sequence inputs require the same decoder depth and proposed Depth-Adaptive transformer, which allows prediction on different depth, achiving near-baseline performance on `IWSLT De-En` with less than one forth decoder layers. [Schwartz et al., ACL 2020] did similar work on classification tasks. They used calibrated confidence to decide whether to exit, keeping equivalent accuracy while achieving highest 5x acceleration as reported. DeeBERT([Xin et al., ACL 2020]) added classifier at every single transformer layer and used prediction entropy instead to decide whether to exit. [Zhou et al., NeurIPS 2020] doubted that single layer judgement is not convincing enough and deprived cross layer patience to indicate whether to continue or to exit. [Elhoushi et al., ACL 2024] further proposed that early layers only generate proposal for later layers to verify. Although they improved model efficiency by reducing inference before exiting, these early-exist methods still follow a sequential forward across continuous prefix model layers.  
+A more general thought of early exist which drop only the latter layers is to skip layers. SmartBERT([Hu et al., IJCAI 2023]), added a skipping gete and a exiting operator to evey layer of BERT; HadSkip([Wang et al., Findings EMNLP 2023]) first used the hidden state of intermediate layers in layer gating, adding a one-hidden-layer FFN at each transformer layer as the gate control; [He et al., EMNLP 2025] only trained tiny layer routers while keeping pretrained backbone model frozen. By this way, they only involve less than $0.01\%$ of backbone parameter sized trainable parameters; Instead of using raw hidden state, [Luo et al., Findings ACL 2025] take $\Delta_{attn}=h_{out}^{attn}-h_{in}^{attn}$ as layer internal evidence to decide whether to skip or not; The thought of budget get extended recently by BUDDY[Zhou et al.,2026 preprint], which used a decision module to mark different intermediate layers and take the top-k layers. 
+A natural extension of skipping or picking layers is allowing repeating the same layer multiple times, continuously or non-continuously. This is not a novel idea. Universal Transformer([Dehghani et al., 2018]) allow a shared recurrent Transformer block to be repetitively computed. Dr.LLM([Heakl et al., ICLR 2026]) combined skipping with repeating, training a lightweight router at each layer which uses windowed mean-pooled hiden state as input to decide whether to skip, execute or repeat. 
+All the method above can be methodologically contained in arbitrary ordered layer routing, which questioned whether the canonical transformer graph itself is optimal, especially under various downstream tasks. Arbitrary order layer allow us to skip, repeat and return to early layers. [Li et al., 2025,Skip a Layer or Loop it? Test-Time Depth Adaptation of Pretrained LLMs.] proposed direct question to whether  a pretrained LLM layer path(L1->L_n) is the optimal to every sample. They take every pretrained layer as an independently callable function and used MCTS to search the best Chain-of-Layers. They found that more than $75\%$ of the originally correct samples have shorter path; and over $60\%$ originally mistaken samples can find corresponding correct alternative paths. This give the fundamental support for arbitrary ordered layer selecting. Later, [Li et al., ICML 2026] found that previous inference-time MCTS in CoLa is too costing, so they trained a lightweighted network directly prediction skip/repeat execution program. In actual implementation, they further packaged pretrained layers into segments and predict segment as a whole; A very latest preprint by [Batorski et al., 2026-08-06], involves current layer, budget, history and context in routing and used top-k viterbi to solve the programs. 
+
+### 2.2 Close Relevant
+
+EXP-001~003 has provided a potential direction for class-aware routing. The broad idea of class awareness in neural routing emerged at 2019, [Su et al.,Dynamic Multi-path Neural Network]. They claimed that dynamic path should not only depend on current state, but also the object category. However, they focused on computer vision and ImageNet and did not explicitly involve class confusion. BADGE([Zhu et al., ACL Industry 2023]), which tested 3 GLUE tasks on BERT, used not only single layer entropy, but also comparing the prediction distributions between 2 layers as a decision indicator. Besides BADGE, more work have been put into constructing more indicator/evidence for router input. DiffSkip([Luo et al.]), as refered above in 2.1, and A-MoD([Gadhikar et al., ICLR 2025 workshop]) all proposed different evidence extracting methods. 
+During our first round browse, no clear evidence found on existing work researching *what indicator/evidence is more appropriate for a router*--no systematic comparison, no ablation analyses. So our direction on class-wareness does not necessarily need to be proposing a novel paradigm or indicator. Looking into the feature structure and relevance of guiding a router might be a potential future direction. But genuine novelty depends on more comprehensive and detailed retrieval verification.  
+Other common ideas, like budget, arbiraray routing, using pre-searched good routes to train small predictors and continuous macro layers have all been directly or indirectly covered by prior works. (e.g., [PABEE, HadSkip, CoLa, Polar] etc.). 
+A recently popular direction is path-awareness. Actually hidden state itself conveys path information, for every layer it drifted pass has exerted influence on its representation. However, can explicitly encoding path history supervise the training process efficiently? Can they carry extra routing value? And how to organize the form of history path, how to balance the complexity and to keep the revised network optimizable but not ruined, still remain hot topic recently(like [Batorski et al. (2026), MACRO: Markov Chain Routing of Transformer Layers.], which we mentioned before).  
+Also a potential direction is sparse non-local route motifs. Although PoLar has already proposed packaged continuous transformer blocks in a model into segments, this kind of segmentation did not cover the case of arbitrary routing path. How to construct this general *vocabulary*, how to find porperties that we can make use of in constructing it, could be our potential novelty direction. 
+
+### 2.4 Limitations and Declarations
+
+This is only a universal and non-detailed history grasp, so the remaining directions above are only not denied by this round of direction probing. Whether they are of practical meaning, and whether they possess the very feature to be adopted require further investigating and experimenting.  
+And although our prior work EXP-001~003 is related to our three directions in cross layer information engineering and class-wise information, several fragmented experiments should be done to provide certain information and verification. We do not write these fragmented experiments official experiment reports, but keep their configuration and artifacts public. Later result references to these data will each be attached with a clear pointer. 
+
+## 3. Inspirations&Facts from Fragmented EXPs after EXP-003
+
+### 3.1 New Models and Bench in New Phase
+
+Back in EXP-003 when we tried to analyse class-wise recoverability, we encountered no-enough-error-samples problems where merely around 3-6 mistaken samples by last layer is obtained per class. That's not strong enough to do a convincing analyais. That's because `CLINC150` only contains short samples. Actually fine-tuning in EXP-002 achieved nearly $97\%$ acc on `CLINC150` test, making the improving space on this dataset marginal. Prior work also showed that even with `CLINC150` small which reduces the count of training samples, best acc could be far over $90\%$([Lee et al. (2021) ]. So, we seek for a more complicated and distinguishing dataset while still satisfying our classification task. `WOS46985`, 7 L1 and 134 L2 classes(\[domain, subcategory\]) classification on 46985 paper abstracts, has more samples than `CLINC150`. **In our research, we make use of L2 classes only**. Moreover, `WOS46985` has an averaged 1300 char sample length(about 250 tokens), much longer than `CLINC150`. Baseline of `DeBERTa-v3-base`(frozen backbone) on `WOS46985` also proved that, with maximum $49.78\%$ probing acc achieved by layer 5, RidgeClassifier. 
+Also, since `WOS46985` has max sample length over 512 token, the maxmum input length of `DeBERTa-v3-base`(512 can still hold over 75% samples(p75 at about 320-330 tokens)), we truncate the exceeded samples(dropping left). As a control, we involve `ModernBERT-base`, which uses RoPE and has maximum input length over 8k.  
+Except `DeBERTa-v3-base` and `ModernBERT-base`, we considered generalization control, with which we involved Qwen3-Embedding-0.6b, a decoder-only architecture with greatly more parameters.  
+
+> in fragmented exps, we did feature collection on WOS46985, which we will use directly in the future. artifacts relative path: `./fragmented-experiments/WOS46985Features_260812_03/`
+
+### 3.2 Interesting Outcomes in Post-003 Fragmented EXPs
+
+>artifacts root: `./fragmented-experiments`
+#### 3.2.1 Variance Compression Exists to Be DeBERTa-v3-base CLS specific
+We checked the inter-sample std on `ModernBERT-base` and `Qwen3-embedding-0.6b`, neither showed any clue for variance compression(artifacts: `./ModernBERTBaseExp1Ver_260812_02`, `./Qwen3Emb0p6bExp1Ver_260812_01`). On the other hand, `DeBERTa-v3-base` encountered the same `CLS` variance compression phenomenon on `WOS46985`. 
+>Corresponding artifacts: 
+>`./ModernBERTBaseExp1Ver_260812_02`
+>`./Qwen3Emb0p6bExp1Ver_260812_01`
+>`./DeBERTaV3BaseWOS46985Baseline_260812_04`
+#### 3.2.2 Fine-tuning Improves DeBERTa-v3-base greatly on WOS46985
+DeBERTa-v3-base with achieves only about 30-50pp early-stop layer acc on `WOS46985`. However, fine-tuning on last-layer acc, where we adopted trainable probe head initialized by frozen backbone training, achieved 83.16pp acc on test. 
+>`./FT-BaselineDeBERTaV3BaseWOS46985_260818_03`
+
+#### 3.2.3 Random Layer Conjunction Usually Fail to Work
+We also did trail experiments to gain evidence for evaluating the potential and method for arbitrary routing family. Our trail experiments contains: 
+1. **Single layer probe**: Use each layer sololy as the first layer and train probe on it. 
+2. **Bi-gram gain**: Compare acc(i, j) with acc(i), see the effect of adding layer j on single i. 
+3. **Greedy path**: Every step take the locally best next layer, under budget $s$. 
+4. **Random path sampling**: Sampled 4.5k random layer paths. 
+For single layer probe, results differ greatly between CLINC150 and WOS46985. Only layer 2 single beats its in-place acc on CLINC150 with mere gain of 0.4pp. But every single layer beats its in-place performance on WOS46985 with max gain by layer 9 at 13.9pp, from 0.41 to 0.55. 
+Same divergence happens on Bi-gram gain. For CLINC150, 42/144 pairs are super-additive, surpassing the best single achieved at layer 2. However, in WOS46985, most pair with $i\neq j$ have their gain negative or near ezro, while repetitive pairs usually attain negative gains. 
+Greedy strategy fails on both dataset. Max acc existed early at 1st and 2nd layers respectively, with most of the rest greedy steps resulting in negative gain. 
+By the time I writing this file, we only had enough time to run random layer path sampling on CLINC150. The result showed an average acc of 62.4pp val acc, max acc being 90.93pp which did not surpass our best-ever record. The average and max acc indicates that completely random combination of different layers does not necessarily gain better result. Statistics show that with the growth of path length, the mean acc declines steadily from 0.836 at $len=3$, to 0.703 at $len=6$, ending $0.413$ at $len=12$. However, as a technique of sampling, we made the sample size of every path length at the same level, whereas the searching space grows exponentially with the increase of path length. So this phenomenon where average acc declines with path length growth does not necessarily mean that longer path should be neglected, since longer random programs themselves are both harder to search and more likely to contain compositionally incompatible transitions. Actually, the maximum acc from path len 3 to len 12 only dropped from some $89.5$pp to $84.2$pp, only some 5pp gap compared to over 40pp drop of mean acc. This finding indirectly inspired me of the major optimizing in our later proposed method.  
+>corresponding experiment artifacts: 
+>`./mudularized_layer_probe_260813_01`
+>`./analysis_mudularized_layer_probe_260813_01`
+>`./DeBERTaV3BaseWOS46985LayerProbe_260814_01`
+>`./Analysis_DeBERTaV3BaseWOS46985LayerProbe_260818_02`
+
+## 4. Proposed Direction
+
+With all the prior work combing and scout experimenting, I came up with a natural direction related to my previous knowledge on searching algorithm.  
+### 4.1 Problem Restatement
+For a language model with Transformer Block Layer architecture, suppose it has $L$ layers. Our task is to find under budget $s,$ where each layer in sequence consumes $1$ out of $s$ in the budget, the optimal layer sequence which the sample forward through, reach at a specific downstream task head and get the best task performance. Every position in the sequence could be arbitrary, ranging from all the model layers.  
+Initially and temporarily, we freeze the model backbone to simplify the problem. The trainable part is the sequence generating algorithm and the downstream task head.  
+
+### 4.2 Problem Analysis
+To search an $s$-length sequence where each position have $L$ choices, the total count of theoretically possible paths is $L^s$. When $L=S=12$, which is a DeBERTa-v3-base, equal-calculation case, the number traverse searching branches are at a scale of over 1e12. And when we want to strike an equal-calculation control where $s=L,$ the complexity of searching space is power-exponential. 
+Heuristic searching depends on heuristic factor and algorithm guidence to limitedly sample the searching space. Properly designed indicator and strategy can often find a relatively acceptabe local optimal within limited steps, while increasing searching steps could increase the probability of converging into a better result. The expected result of searching such an exponentially large discrete search space depends on the strategy, sampling steps and the complexity of the searching space. 
+
+### 4.3 Current Methods
+Previous work searching for such a path(skip, reapeat, arbitrary) mostly used MCTS([Dr.LLM, Heakl et al.; CoLa; PoLar, Li et al.], online or offline). *CoLa* used UCB-guided MCTS to search every sample 200 MCTS simulations, with heuristic indicator:$$UCB(P)=\underbrace{\dfrac{Q(P)}{v(P)}}_{\text{exploitation}}+\underbrace{c\sqrt{\dfrac{lnV}{v(P)}}}_{\text{exploration}}-\underbrace{\lambda\dfrac{||P||}{N}}_{\text{length penalty}}\tag{1}.$$For a great proportion of the samples, this method successfully found a *better*(recovered or shorter) path, proving the potential of arbitrary layer slecting. However, searching sample-wisely on such an exponential space is too much calculating when inferencing. Li et al. further looked into a learnable program predictor. They found in *PoLar* that most segments in good routes are continuous. So they combine continuous layers into segments. By using the MCTS results as supervisor, they trained a predictor that takes in the embedding of model input using another frozen embedding model, which generates the segmentation and segment operation logits for each segment. Then they do a small search on the smaller seqment-operation space. 
+Both *CoLa* and *PoLar* tried to search the layer path/program for each sample. This actully indicates a question in in layer selecting: now that canonical model layer sequence is not always the best sequence, a new path should be searched. But, how frequently should we search a new path, per task, per sample class, or per sample?  
+A very recent preprint, *MACRO*([Batorski et al., 2026.8]), compacted the routing information containing layer ID($l$), budget info($\phi$), incoming displacement($\delta$) and a binary operator context($o$) into a compressed state: $$s_t=(l,\phi,\delta,o),\tag{2}$$learning a path distribution $\pi^*(a|s)$ where $s$ is the current state and $a$ is the corresponding action. Then they sample $K=30$ routes according to current $\pi(a|s)$, run them on current train data to update the distribution state. By this way, this method eventually learned a task-specific route distribution. While predicting, hey they exploited a **exact top-k Viterbi decoding**: $$\log P(r)=\sum_t\log \pi^*(a_t|s_t),\tag{3}$$ranking $k$ different routes $r_{1-k}$ by their probabilities and take the top 5 candidate routes. These 5 routes will be test on validation set to get the shortest path in those achieving the highest acc. 
+From my perspective, this to-what-grain problem is a balance between searching precision and optimizing complexity. Although finding an exact routing for each sample could be more precise, since not all samples under the same task do for the very route, the sampling and calculation needed to converge in such a large searching scope is much higher than that of task-wise routing. What's more, a real generalizing gap in *CoLa* is that their accumulate paths are from training set, traversing these paths on test set does not necessarily cover all the cases for every tested sample.
+
+### 4.4 Sampling Size MATCHING Searching Space Is the Trick
+For an $s$-step problem where each step has $L$-choice, if we have a $n$-sample training set which could be classified into $C$ classes, and we reuse each sample $e$ times. For different grained route-searching stragegy, their per-route sampling number is:  
+
+|    Grain    |    Sampling density    | Searching Space/Route | Routes2Search |
+| :---------: | :--------------------: | :-------------------: | :-----------: |
+|  task wise  |      $n\times e$       |         $L^s$         |      $1$      |
+| class wise  | $\dfrac{n}{C}\times e$ |         $L^s$         |      $C$      |
+| sample wise |          $e$           |         $L^s$         |      $n$      |
+The comparison is hereby clear: under equal training calculation input, different tasks have different sampling density. Actually, in *CoLa*, they simulate MCTS for each samples 200 times($e=200$), while in *MACRO*, for each $\pi$ update iteration, they sample $K=30$ routes according to current $\pi$. In their experiment, the max iteration round is $10$. So, under the context of same dataset, *MACRO* involves significantly less calculation than *CoLa*.  
+
+### 4.5 Simplifying Searching Space
+Under constant indicator and stragegy, increasing sampling density is a method to increase the probability of getting a better solution, while simplifying the complexity of searching space is another. Corresponding methods in algorithm involve branch-cutting, problem redefining and so on. 
+*PoLar* researched the good routes in their experiment and found that most of them contain consecutive segments. So their trained predictor not only predict the routing program, but also the segmentation method. Their segments contain length 1-4. 
+The effect of this simplification is obvious, since under static budget size $s$, adding longer segments increases the probability of reducing the exponent. A simplified case, if every step used k layers, then the searching space under budget size $s$ is reduced from $L^s$ to $||V||^\frac{s}{k}$, where $||V||$ is the $k$-gram option-vocabulary size.  
+
+### 4.6 Collect New Ideas We would Like to Try
+The following ideas are still at inspiration/potential method level, whether they can become our official proposed-methods should be tested in out layer EXP-004~00X.  
+#### 4.6.1 Sparse and Encompassing Vocabulary
+*PoLar* has already involved segmenting continuous layer in the range of 1-4 sizes. However, their segmentation is offered by trained predictor, this randomness do not explicitly ensure representativity of good routes. Also, although in their experiment, consecutivity is observed on segments in good paths, adding certain sparse conjunctions might help prevent the searching process from converging too early to a local optimal. 
+We would to try explicitly making Encompassing supervise the segmentation training. And we want to try involving sparsity. For a simple instance, when we involve bigram, we wanna see how many single layers in the original vocabulay(which contains only the $L$ single layers) can be replaced by bigram while keeping the new vocabulary able to represent or generate all the tagged good paths. 
+In real experiments, we will open up vocabulary size(choice num at every step), tri-gram(longer gram helps simplifying the searching space more but reduces flexity), princple of choosing the must-encompass good path(too many->too hard; too few->not indicative enough) sets e.t.c., as our experimented configurations. 
+#### 4.6.2 Researching Different Route-Changing Grain
+This idea consists of different relating targets. 
+##### (a). Determine Fine-Grain--Calculation Trade-off
+In section 4.4, we analysed the relationship between sampling density and route-varying frequency. So we would like to see whether the enhancement of finer-grain exists, and how this improvement trade off with calculation input(under fixed searching stragegy family). 
+##### (b). Balancing Optimizing Difficulty and Theoretical Upper Bound
+Previously we suspect that sample-wise routing might make the router hard to optimize since it involved too much complexity. On the other hand sample-wise routing methodologically contains task-wise routing(a static sample router routing all samples to the same path equals task-wise routing). So theoretically, if we decrease the methodological complexity, the optimizing effect might rise, while the theoretical upper bound of the method declines. The point where they meet is the point we would like to search.  
+
+Our current method on how to control the routing frequency lies in the *class* mentioned in section 4.4. This class is not the classification class, but a controlled class division learnt from training. When the class number $C=1,$ it is task-wise; And when $C=n,$ it becomes sample-wise. For detailed class deviding method and training method, we will research and experiment them in later real-case experiments.  
+
+#### 4.6.3 What the Router Is Like
+After 4.6.1 and 4.6.2 is determined, the broad paradigm of our routing is determined(segmentation and grain). Then we would like to carry out experiments on how to properly design the artitecture, training method and prediction procedure of our proposed router. Since we have not yet the result of 4.6.1 and 4.6.2, and whether they can succeed is not yet redictable by now. We do not dig deep in details about this part.  
+
+## 5. Plans for EXP-004~006
+
+EXP-004~006 will cover our proposed ideas in section 4.6. All the experiments will have core targets and clear accpet/refuse gate. As before, all the configurations and artifacts will be recorded and opened pubicly. 
+In parellel with EXP-004~006, we plan to continue with our fragmented experiments, which, in this phase, will focus on reproducing/desigining several control groups from typical methods/our close relevant works to serve later as our baseline and control/ablation group.  
