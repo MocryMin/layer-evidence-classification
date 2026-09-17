@@ -2,7 +2,7 @@
 
 This repository records an independent research project on intermediate-layer
 evidence, readout validity, and alternative layer paths in pretrained language
-models. The project is being developed as preliminary work for a PhD research
+models. The project provides preliminary evidence for an initial PhD research
 proposal; it is a research record rather than a finished paper.
 
 ## Public evidence release
@@ -47,8 +47,8 @@ and provenance.
 
 ## For prospective supervisors and reviewers
 
-- [Research-proposal workspace](proposal/README.md) — the 2--4 page proposal
-  will be the short entry point once its first version is frozen.
+- [Research proposal](proposal/README.md) — proposal status and supporting
+  evidence.
 - [Claim-to-evidence index](docs/EVIDENCE_INDEX.md) — the fastest route from a
   proposal claim to its log, report, configuration, run, and artifact.
 - [Research logs](research-logs/README.md) — author-written chronological
@@ -68,7 +68,7 @@ and provenance.
 ## Evidence architecture
 
 ```text
-2--4 page RP
+Research proposal
     -> claim IDs and evidence index
         -> author research logs + objective agent reports
             -> frozen configs + source + tests + Git commits
